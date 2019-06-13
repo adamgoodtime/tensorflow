@@ -4,56 +4,6 @@ import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
 
-            v_rest = -65.0  # Resting membrane potential in mV.
-            v_rest_stdev = 5
-            cm = 1.0  # Capacity of the membrane in nF
-            cm_stdev = 0.3
-            tau_m = 20.0  # Membrane time constant in ms.
-            tau_m_stdev = 5
-            tau_refrac = 0.1  # Duration of refractory period in ms.
-            tau_refrac_stdev = 0.03
-            tau_syn_E = 5  # Rise time of the excitatory synaptic alpha function in ms.
-            tau_syn_E_stdev = 1.6
-            tau_syn_I = 5  # Rise time of the inhibitory synaptic alpha function in ms.
-            tau_syn_I_stdev = 1.6
-            e_rev_E = 0.0  # Reversal potential for excitatory input in mV
-            e_rev_E_stdev = 0
-            e_rev_I = -70.0  # Reversal potential for inhibitory input in mV
-            e_rev_I_stdev = 3
-            v_thresh = -50.0  # Spike threshold in mV.
-            v_thresh_stdev = 5
-            v_reset = -65.0  # Reset potential after a spike in mV.
-            v_reset_stdev = 5
-            i_offset = 0  # Offset current in nA
-            i_offset_stdev = input_current_stdev
-            v = -65.0  # 'v_starting'
-            v_stdev = 5
-        elif neuron_type == 'IF_curr_exp':
-            v_rest = -65.0  # Resting membrane potential in mV.
-            v_rest_stdev = 5
-            cm = 1.0  # Capacity of the membrane in nF
-            cm_stdev = 0.3
-            tau_m = 20.0  # Membrane time constant in ms.
-            tau_m_stdev = 5
-            tau_refrac = 0.1  # Duration of refractory period in ms.
-            tau_refrac_stdev = 0.03
-            tau_syn_E = 5  # Rise time of the excitatory synaptic alpha function in ms.
-            tau_syn_E_stdev = 1.6
-            tau_syn_I = 5  # Rise time of the inhibitory synaptic alpha function in ms.
-            tau_syn_I_stdev = 1.6
-            v_thresh = -50.0  # Spike threshold in mV.
-            v_thresh_stdev = 5
-            v_reset = -65.0  # Reset potential after a spike in mV.
-            v_reset_stdev = 5
-            i_offset = 0  # Offset current in nA
-            i_offset_stdev = input_current_stdev
-            v = -65.0  # 'v_starting'
-            v_stdev = 5
-
-
-u_rest=-65.0, u_thresh=-50.0, tau_rest=4.0, r=1.0, tau=10.0, q=1.5,
-                 tau_syn=10.0)
-
 class LIFNeuron(object):
 
     def __init__(self, u_rest=0.0, u_thresh=1.0, tau_rest=4.0, r=1.0, tau=10.0):
