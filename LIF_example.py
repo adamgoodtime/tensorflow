@@ -58,8 +58,8 @@ class LIFNeuron(object):
         # Refractory period is 0
         t_rest_op = self.t_rest.assign(0.0)
 
-        with tf.control_dependencies([t_rest_op]):
-            return u_op
+        # with tf.control_dependencies([t_rest_op]):
+        return u_op, t_rest_op
 
     # Neuron behaviour during firing phase (above threshold)
     def get_firing_op(self):
@@ -68,8 +68,8 @@ class LIFNeuron(object):
         # Refractory period starts now
         t_rest_op = self.t_rest.assign(self.tau_rest)
 
-        with tf.control_dependencies([t_rest_op]):
-            return u_op
+        # with tf.control_dependencies([t_rest_op]):
+        return u_op, t_rest_op
 
     # Neuron behaviour during resting phase (t_rest > 0)
     def get_resting_op(self):
@@ -78,8 +78,8 @@ class LIFNeuron(object):
         # Refractory period is decreased by dt
         t_rest_op = self.t_rest.assign_sub(self.dt)
 
-        with tf.control_dependencies([t_rest_op]):
-            return u_op
+        # with tf.control_dependencies([t_rest_op]):
+        return u_op, t_rest_op
 
     def get_potential_op(self):
         return tf.case(
@@ -91,108 +91,108 @@ class LIFNeuron(object):
         )
 
 
-# Simulation with square input currents
-
-# Duration of the simulation in ms
-T = 200
-# Duration of each time step in ms
-dt = 1
-# Number of iterations = T/dt
-steps = int(T / dt)
-# Output variables
-I = []
-U = []
-
-neuron = LIFNeuron()
-
-with tf.Session(graph=neuron.graph) as sess:
-    sess.run(tf.global_variables_initializer())
-
-    for step in range(steps):
-
-        t = step * dt
-        # Set input current in mA
-        if t > 10 and t < 30:
-            i_app = 0.5
-        elif t > 50 and t < 100:
-            i_app = 1.2
-        elif t > 120 and t < 180:
-            i_app = 1.5
-        else:
-            i_app = 0.0
-
-        feed = {neuron.i_app: i_app, neuron.dt: dt}
-
-        u = sess.run(neuron.potential, feed_dict=feed)
-
-        I.append(i_app)
-        U.append(u)
-
-
-
-plt.rcParams["figure.figsize"] =(12,6)
-# Draw the input current and the membrane potential
-plt.figure()
-plt.plot([i for i in I])
-plt.title('Square input stimuli')
-plt.ylabel('Input current (I)')
-plt.xlabel('Time (msec)')
-plt.figure()
-plt.plot([u for u in U])
-plt.axhline(y=1.0, color='r', linestyle='-')
-plt.title('LIF response')
-plt.ylabel('Membrane Potential (mV)')
-plt.xlabel('Time (msec)')
-plt.show()
-
-# Simulation with random input currents
-
-# Duration of the simulation in ms
-T = 200
-# Duration of each time step in ms
-dt = 1
-# Number of iterations = T/dt
-steps = int(T / dt)
-# Output variables
-I = []
-U = []
-
-neuron = LIFNeuron()
-
-with tf.Session(graph=neuron.graph) as sess:
-    sess.run(tf.global_variables_initializer())
-
-    for step in range(steps):
-
-        t = step * dt
-        if t > 10 and t < 180:
-            i_app = np.random.normal(1.5, 1.0)
-        else:
-            i_app = 0.0
-
-        feed = {neuron.i_app: i_app, neuron.dt: dt}
-
-        u = sess.run(neuron.potential, feed_dict=feed)
-
-        I.append(i_app)
-        U.append(u)
-
-
-
-plt.rcParams["figure.figsize"] =(12,6)
-# Draw the input current and the membrane potential
-plt.figure()
-plt.plot([i for i in I])
-plt.title('Random input stimuli')
-plt.ylabel('Input current (I)')
-plt.xlabel('Time (msec)')
-plt.figure()
-plt.plot([u for u in U])
-plt.axhline(y=1.0, color='r', linestyle='-')
-plt.title('LIF response')
-plt.ylabel('Membrane Potential (mV)')
-plt.xlabel('Time (msec)')
-plt.show()
+# # Simulation with square input currents
+#
+# # Duration of the simulation in ms
+# T = 200
+# # Duration of each time step in ms
+# dt = 1
+# # Number of iterations = T/dt
+# steps = int(T / dt)
+# # Output variables
+# I = []
+# U = []
+#
+# neuron = LIFNeuron()
+#
+# with tf.Session(graph=neuron.graph) as sess:
+#     sess.run(tf.global_variables_initializer())
+#
+#     for step in range(steps):
+#
+#         t = step * dt
+#         # Set input current in mA
+#         if t > 10 and t < 30:
+#             i_app = 0.5
+#         elif t > 50 and t < 100:
+#             i_app = 1.2
+#         elif t > 120 and t < 180:
+#             i_app = 1.5
+#         else:
+#             i_app = 0.0
+#
+#         feed = {neuron.i_app: i_app, neuron.dt: dt}
+#
+#         u = sess.run(neuron.potential, feed_dict=feed)
+#
+#         I.append(i_app)
+#         U.append(u)
+#
+#
+#
+# plt.rcParams["figure.figsize"] =(12,6)
+# # Draw the input current and the membrane potential
+# plt.figure()
+# plt.plot([i for i in I])
+# plt.title('Square input stimuli')
+# plt.ylabel('Input current (I)')
+# plt.xlabel('Time (msec)')
+# plt.figure()
+# plt.plot([u for u in U])
+# plt.axhline(y=1.0, color='r', linestyle='-')
+# plt.title('LIF response')
+# plt.ylabel('Membrane Potential (mV)')
+# plt.xlabel('Time (msec)')
+# plt.show()
+#
+# # Simulation with random input currents
+#
+# # Duration of the simulation in ms
+# T = 200
+# # Duration of each time step in ms
+# dt = 1
+# # Number of iterations = T/dt
+# steps = int(T / dt)
+# # Output variables
+# I = []
+# U = []
+#
+# neuron = LIFNeuron()
+#
+# with tf.Session(graph=neuron.graph) as sess:
+#     sess.run(tf.global_variables_initializer())
+#
+#     for step in range(steps):
+#
+#         t = step * dt
+#         if t > 10 and t < 180:
+#             i_app = np.random.normal(1.5, 1.0)
+#         else:
+#             i_app = 0.0
+#
+#         feed = {neuron.i_app: i_app, neuron.dt: dt}
+#
+#         u = sess.run(neuron.potential, feed_dict=feed)
+#
+#         I.append(i_app)
+#         U.append(u)
+#
+#
+#
+# plt.rcParams["figure.figsize"] =(12,6)
+# # Draw the input current and the membrane potential
+# plt.figure()
+# plt.plot([i for i in I])
+# plt.title('Random input stimuli')
+# plt.ylabel('Input current (I)')
+# plt.xlabel('Time (msec)')
+# plt.figure()
+# plt.plot([u for u in U])
+# plt.axhline(y=1.0, color='r', linestyle='-')
+# plt.title('LIF response')
+# plt.ylabel('Membrane Potential (mV)')
+# plt.xlabel('Time (msec)')
+# plt.show()
 
 
 # A new neuron model derived from the LIF neuron
@@ -286,6 +286,8 @@ W = np.random.normal(1.0, 0.5, size=n_syn)
 # Output variables
 I = []
 U = []
+R = []
+A = []
 
 # Instantiate our synaptic LIF neuron, with a memory of 200 events
 # Note that in practice, a much shorter period is required as the
@@ -307,7 +309,7 @@ with tf.Session(graph=neuron.graph) as sess:
         i, u = sess.run([neuron.input, neuron.potential], feed_dict=feed)
 
         I.append(i)
-        U.append(u)
+        U.append(u[0])
 
 plt.rcParams["figure.figsize"] =(12,6)
 # Draw spikes
@@ -332,3 +334,5 @@ plt.title('LIF response')
 plt.ylabel('Membrane Potential (mV)')
 plt.xlabel('Time (msec)')
 plt.show()
+
+print("Done")

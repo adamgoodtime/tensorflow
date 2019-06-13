@@ -81,10 +81,6 @@ class SpiNN_LIF_curr_exp(object):
     def get_vars_and_ph(self):
         # The current membrane potential
         self.v = tf.Variable(self.v_rest, dtype=tf.float32, name='v')
-        self.var1 = tf.Variable(0.0, dtype=tf.float32, name='v1')
-        self.var2 = tf.Variable(0.0, dtype=tf.float32, name='v1')
-        self.var3 = tf.Variable(0.0, dtype=tf.float32, name='v1')
-        self.var4 = tf.Variable(0.0, dtype=tf.float32, name='v1')
         # The duration left in the resting period (0 most of the time except after a neuron spike)
         self.t_rest = tf.Variable(0.0, dtype=tf.float32, name='t_rest')
         # Input current
@@ -99,39 +95,33 @@ class SpiNN_LIF_curr_exp(object):
     def get_integrating_op(self):
         alpha = tf.add(tf.multiply(self.get_input_current(), self.r_mem), self.v_rest)
 
-        tau_mem = tf.math.exp(tf.subtract(0.0, tf.divide(self.dt, tf.multiply(self.r_mem, self.cm))))
+        tau_mem = tf.math.exp(tf.negative(tf.divide(self.dt, tf.multiply(self.r_mem, self.cm))))
 
         v_op = self.v.assign(tf.multiply(self.dt, tf.subtract(alpha, tf.multiply(tau_mem, tf.subtract(alpha, self.v)))))
 
         t_rest_op = self.t_rest.assign(0.0)
 
-        v1 = self.var1.assign(alpha)
-        # self.var2.assign(tau_mem)
-        v3 = self.var3.assign(v_op)
-        v4 = self.var4.assign(t_rest_op)
+        # with tf.control_dependencies([t_rest_op]):
+        return v_op, t_rest_op
 
-        # print("tau_m:", tau_mem.eval(session=self.sess), "alpha:", alpha.eval(session=self.sess), "v:", self.v.eval(session=self.sess), "v_op:", v_op.eval(session=self.sess))
-
-        with tf.control_dependencies([t_rest_op]):
-            return v_op#, v1, v3, v4
-
+    # function to be called if the neuron fires
     def get_firing_op(self):
         v_op = self.v.assign(self.v_rest)
 
         t_rest_op = self.t_rest.assign(self.tau_refract)
 
-        with tf.control_dependencies([t_rest_op]):
-            return v_op
+        # with tf.control_dependencies([t_rest_op]):
+        return v_op, t_rest_op
 
-
+    # function to be called if in refractory period
     def get_resting_op(self):
         # Membrane potential stays at u_rest
         v_op = self.v.assign(self.v_reset)
         # Refractory period is decreased by dt
         t_rest_op = self.t_rest.assign_sub(self.dt)
 
-        with tf.control_dependencies([t_rest_op]):
-            return v_op
+        # with tf.control_dependencies([t_rest_op]):
+        return v_op, t_rest_op
 
     def get_potential_op(self):
         return tf.case(
@@ -141,6 +131,61 @@ class SpiNN_LIF_curr_exp(object):
             ],
             default=self.get_integrating_op
         )
+
+class SpiNN_LIF_curr_exp_syn(SpiNN_LIF_curr_exp):
+
+    def __init__(self, weights, neuron_id, max_spikes=100, v_rest=-65.0, cm=1.0, tau_m=20.0, tau_refract=5.0, v_thresh=-50.0, v_reset=-65.0, i_offest=0.0):
+        self.weights = weights
+        self.n_syn = len(weights)
+        self.neuron_id = neuron_id
+        self.max_spikes = max_spikes
+
+        super(SpiNN_LIF_curr_exp_syn, self).__init__(v_rest, cm, tau_m, tau_refract, v_thresh, v_reset, i_offest)
+
+    def get_vars_and_ph(self):
+        # Get parent grah variables and placeholders
+        super(SpiNN_LIF_curr_exp_syn, self).get_vars_and_ph()
+
+        # A placeholder indicating which synapse spiked in the last time step
+        self.syn_has_spiked = tf.placeholder(shape=[self.n_syn], dtype=tf.bool)
+        # History of spikes
+        self.spike_history = tf.Variable(tf.constant(-1.0, shape=[self.max_spikes, 2], dtype=tf.float32))
+        # Variable to keep track of current index being used
+        self.current_index = tf.Variable(0, dtype=tf.int32)
+
+    def extract_spike_times(self):
+        for neuron in range(self.syn_has_spiked):
+            if self.syn_has_spiked[neuron]:
+                self.add_spike(neuron)
+
+    def add_spike(self, index):
+        self.spike_history[self.current_index] = [index, self.dt]
+        self.current_index.assign(tf.mod(tf.add(self.current_index, 1), self.max_spikes))
+
+    # def here is wher eyou return the value of the exponential at a certain time
+
+    def get_input_op(self):
+        # Update our memory of spike times with the new spikes
+        t_spikes_op = self.extract_spike_times()
+
+        # Evaluate synaptic input current for each spike on each synapse
+        i_syn_op = tf.where(t_spikes_op >= 0,
+                            self.q / self.tau_syn * tf.exp(tf.negative(t_spikes_op / self.tau_syn)),
+                            t_spikes_op * 0.0)
+
+        # Add each synaptic current to the input current
+        i_op = tf.reduce_sum(self.w * i_syn_op)
+
+        return tf.add(self.i_offest, i_op)
+
+#create a network of SpiNNaker neurons
+class SpiNN_network(SpiNN_LIF_curr_exp_syn):
+    def __init__(self, weights, max_spikes=100, v_rest=-65.0, cm=1.0, tau_m=20.0, tau_refract=5.0, v_thresh=-50.0, v_reset=-65.0, i_offest=0.0):
+
+        for neuron_id in range(len(weights)):
+            super(SpiNN_network, self).__init__(weights, neuron_id, max_spikes, v_rest, cm, tau_m, tau_refract, v_thresh, v_reset, i_offest)
+
+
 
 # Simulation with square input currents
 
@@ -175,22 +220,24 @@ with tf.Session(graph=neuron.graph) as sess:
 
         feed = {neuron.i_curr: i_app, neuron.dt: dt}
 
-        u = sess.run(neuron.potential, feed_dict=feed)
+        # output = sess.run(neuron.potential, feed_dict=feed)
+        # membrane_v = output[0]
+        # resting_period = output[1]
+        [membrane_v, resting_period] = sess.run(neuron.potential, feed_dict=feed)
 
-
-        print("v:", neuron.v.eval())
-        # tf.print(neuron.get_integrating_op(), [neuron.v], message="tfv")
-        # print(sess.run(neuron.var1), "did it?")
-        # tf.print(neuron.get_integrating_op(), neuron.v)
-        # tf.print(neuron.v, neuron.get_integrating_op())
-        # tf.print(neuron.get_integrating_op(), [neuron.var1], message="tfv1")
-        print("v1:", neuron.var1.eval())
-        print("v2:", neuron.var2.eval())
-        print("v3:", neuron.var3.eval())
-        print("v4:", neuron.var4.eval())
+        # print("v:", neuron.v.eval())
+        # # tf.print(neuron.get_integrating_op(), [neuron.v], message="tfv")
+        # # print(sess.run(neuron.var1), "did it?")
+        # # tf.print(neuron.get_integrating_op(), neuron.v)
+        # # tf.print(neuron.v, neuron.get_integrating_op())
+        # # tf.print(neuron.get_integrating_op(), [neuron.var1], message="tfv1")
+        # print("v1:", neuron.var1.eval())
+        # print("v2:", neuron.var2.eval())
+        # print("v3:", neuron.var3.eval())
+        # print("v4:", neuron.var4.eval())
 
         I.append(i_app)
-        U.append(u)
+        U.append(membrane_v)
 
 
 

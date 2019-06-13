@@ -68,16 +68,16 @@ class SpiNN_LIF_curr_exp(object):
 
         # print("tau_m:", tau_mem.eval(session=self.sess), "alpha:", alpha.eval(session=self.sess), "v:", self.v.eval(session=self.sess), "v_op:", v_op.eval(session=self.sess))
 
-        with tf.control_dependencies([t_rest_op]):
-            return v_op#, v1, v3, v4
+        # with tf.control_dependencies([t_rest_op]):
+        return v_op, t_rest_op
 
     def get_firing_op(self):
         v_op = self.v.assign(self.v_rest)
 
         t_rest_op = self.t_rest.assign(self.tau_refract)
 
-        with tf.control_dependencies([t_rest_op]):
-            return v_op
+        # with tf.control_dependencies([t_rest_op]):
+        return v_op, t_rest_op
 
 
     def get_resting_op(self):
@@ -86,8 +86,8 @@ class SpiNN_LIF_curr_exp(object):
         # Refractory period is decreased by dt
         t_rest_op = self.t_rest.assign_sub(self.dt)
 
-        with tf.control_dependencies([t_rest_op]):
-            return v_op
+        # with tf.control_dependencies([t_rest_op]):
+        return v_op, t_rest_op
 
     def get_potential_op(self):
         return tf.case(
@@ -146,7 +146,7 @@ with tf.Session(graph=neuron.graph) as sess:
         print("v4:", neuron.var4.eval())
 
         I.append(i_app)
-        U.append(u)
+        U.append(u[0])
 
 
 
