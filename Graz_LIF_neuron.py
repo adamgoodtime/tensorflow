@@ -4,7 +4,7 @@ import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
 
-class SpiNN_LIF_curr_exp(object):
+class Graz_LIF_curr_exp(object):
 
     def __init__(self, v_rest=-65.0, cm=1.0, tau_m=20.0, tau_refract=5.0, v_thresh=-50.0, v_reset=-65.0, i_offest=0.0):
         self.alpha = 0.9
@@ -110,7 +110,7 @@ steps = int(T / dt)
 I = []
 U = []
 
-neuron = SpiNN_LIF_curr_exp()
+neuron = Graz_LIF_curr_exp()
 
 with tf.Session(graph=neuron.graph) as sess:
 
