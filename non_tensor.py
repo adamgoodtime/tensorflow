@@ -136,15 +136,23 @@ def back_prop(spike_history, voltage_history, network):
     # dEdVt = (dEdz * dzdu / network.v_thresh) + (dEdVt1 * network.alpha)
     # dEdzt = dEdz - (dEdVt1 * dt * network.v_thresh) + \
     #         sum([dEdVt1 * network.weight_matrix["blah"] * (1 - network.alpha) * network.r_mem for neuron in network.neuron_list])
-    dEdz = [[0.0 for i in range(T/dt)] for neuron in range(number_of_neurons)]
-    dEdV = [[0.0 for i in range(T/dt)] for neuron in range(number_of_neurons)]
-    dEdWi = [[0.0 for i in range(T/dt)] for neuron in range(number_of_neurons)]
-    dEdWr = [[0.0 for i in range(T/dt)] for neuron in range(number_of_neurons)]
+    dEdz = [[0.0 for i in range(T/dt + 1)] for neuron in range(number_of_neurons)]
+    dEdV = [[0.0 for i in range(T/dt + 1)] for neuron in range(number_of_neurons)]
+    dEdWi = [[0.0 for i in range(T/dt + 1)] for neuron in range(number_of_neurons)]
+    dEdWr = [[0.0 for i in range(T/dt + 1)] for neuron in range(number_of_neurons)]
     for t in range(T/dt-1, -1, -1):
         for neuron in range(number_of_neurons):
+            this_neuron = network.neuron_list[neuron]
             if spike_history[neuron][t]:
-                dEdz[neuron][t] = error
-                dEdV[neuron][t] = dEdz[neuron][t] *
+                p_dEdz = error
+                sum_dEdV = sum([dEdV[n][t+1] *
+                                weight_matrix[neuron][n] *
+                                (1-network.neuron_list[n].alpha) *
+                                this_neuron.r_mem
+                                for n in range(number_of_neurons)])
+                dEdz[neuron][t] = p_dEdz - (dEdV[neuron][t+1] * dt * this_neuron.v_thresh) + sum_dEdV
+                dEdV[neuron][t] = dEdz[neuron][t] * ((1/dt)/voltage_history[neuron][t]) * (1/this_neuron.v_thresh) + \
+                                  (dEdV[t+1] * this_neuron.alpha)
 
 
 
