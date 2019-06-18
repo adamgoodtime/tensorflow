@@ -17,6 +17,7 @@ class Graz_LIF(object):
         self.i_offset = i_offset
         # state variables
         self.v = self.v_rest
+        self.scaled_v = (self.v - self.v_thresh) / self.v_thresh
         self.t_rest = 0.0
         self.i = self.i_offset
         # network variables
@@ -32,8 +33,8 @@ class Graz_LIF(object):
     def integrating(self):
         self.has_spiked = False
         current = self.return_current()
-        scaled_v = (self.v - self.v_thresh) / self.v_thresh
-        z = self.H(scaled_v) * (1 / self.dt)
+        self.scaled_v = (self.v - self.v_thresh) / self.v_thresh
+        z = self.H(self.scaled_v) * (1 / self.dt)
         update = (self.alpha * (self.v - self.v_rest)) + ((1 - self.alpha) * self.r_mem * current)# - (self.dt * self.v_thresh * z)
         self.v = update
 
@@ -126,15 +127,25 @@ def calc_error(spike_history, single_error_neuron=True):
     return error
 
 # error = 0.5 (y - y_target)^2
-def back_prop(spike_history, network):
+def back_prop(spike_history, voltage_history, network):
     error = calc_error(spike_history)
-    theta = 1
-    dEdz = theta * error
-    dzdu = 0
-    dEdVt1 = 0
-    dEdVt = (dEdz * dzdu / network.v_thresh) + (dEdVt1 * network.alpha)
-    dEdzt = dEdz - (dEdVt1 * dt * network.v_thresh) + \
-            sum([dEdVt1 * network.weight_matrix["blah"] * (1 - network.alpha) * network.r_mem for neuron in network.neuron_list])
+    # theta = 1
+    # dEdz = theta * error
+    # dzdu = 0
+    # dEdVt1 = 0
+    # dEdVt = (dEdz * dzdu / network.v_thresh) + (dEdVt1 * network.alpha)
+    # dEdzt = dEdz - (dEdVt1 * dt * network.v_thresh) + \
+    #         sum([dEdVt1 * network.weight_matrix["blah"] * (1 - network.alpha) * network.r_mem for neuron in network.neuron_list])
+    dEdz = [[0.0 for i in range(T/dt)] for neuron in range(number_of_neurons)]
+    dEdV = [[0.0 for i in range(T/dt)] for neuron in range(number_of_neurons)]
+    dEdWi = [[0.0 for i in range(T/dt)] for neuron in range(number_of_neurons)]
+    dEdWr = [[0.0 for i in range(T/dt)] for neuron in range(number_of_neurons)]
+    for t in range(T/dt-1, -1, -1):
+        for neuron in range(number_of_neurons):
+            if spike_history[neuron][t]:
+                dEdz[neuron][t] = error
+                dEdV[neuron][t] = dEdz[neuron][t] *
+
 
 
 # Network
@@ -156,13 +167,17 @@ if weight_matrix:
 
         network = Network(weight_matrix=weight_matrix, tau_refract=0)
         spikes = [False for neuron in range(number_of_neurons)]
+        all_spikes = []
         # Output variables
         I = []
         V = []
+        scaled_V = []
         spike_history_index = []
         spike_history_time = []
 
         for step in range(steps):
+
+            all_spikes.append(spikes)
 
             t = step * dt
 
@@ -172,14 +187,17 @@ if weight_matrix:
             # Set input current in mA and save var
             i = []
             v = []
+            sc = []
             spikes = []
             for neuron in network.neuron_list:
                 neuron.i_offset = np.random.random() * 0.06
                 i.append(neuron.i_offset)
                 v.append(neuron.v)
+                sc.append(neuron.scaled_v)
                 spikes.append(neuron.has_spiked)
             I.append(i)
             V.append(v)
+            scaled_V.append(sc)
 
             for neuron in range(number_of_neurons):
                 if spikes[neuron]:
@@ -188,6 +206,7 @@ if weight_matrix:
 
         I = np.transpose(I).tolist()
         V = np.transpose(V).tolist()
+        scaled_V = np.transpose(scaled_V).tolist()
 
         plt.rcParams["figure.figsize"] = (12, 6)
         # Draw the input current and the membrane potential
