@@ -132,69 +132,69 @@ class SpiNN_LIF_curr_exp(object):
             default=self.get_integrating_op
         )
 
-class SpiNN_LIF_curr_exp_syn(SpiNN_LIF_curr_exp):
-
-    def __init__(self, weights, neuron_id, v_rest=-65.0, cm=1.0, tau_m=20.0, tau_refract=5.0,
-                 v_thresh=-50.0, v_reset=-65.0, i_offest=0.0):
-        self.n_syn = len(weights)
-        self.neuron_id = neuron_id
-        self.weights = weights
-
-        super(SpiNN_LIF_curr_exp_syn, self).__init__(v_rest, cm, tau_m, tau_refract, v_thresh, v_reset, i_offest)
-
-    def get_vars_and_ph(self):
-        # Get parent grah variables and placeholders
-        super(SpiNN_LIF_curr_exp_syn, self).get_vars_and_ph()
-
-        # A placeholder indicating which synapse spiked in the last time step
-        self.syn_has_spiked = tf.placeholder(shape=[self.n_syn], dtype=tf.bool)
-        # current information
-        self.old_current = tf.Variable(0.0, dtype=tf.float32)
-        self.new_current = tf.Variable(0.0, dtype=tf.float32)
-        # the last time there was an update
-        self.old_dt = tf.Variable(0.0, tf.float32)
-
-    def add_spikes_to_current(self):
-        tf.case([self.syn_has_spiked > 0, self.add_weight(self.syn_has_spiked)])
-        # for neuron in range(self.n_syn):
-        #     tf.case([(self.syn_has_spiked[neuron] is True, self.add_spike(neuron))])
-            # if self.syn_has_spiked[neuron]:
-            #     self.add_spike(neuron)
-
-    def add_spike(self, index):
-        init = 0.9063462346100909
-        self.new_current.assign_add(tf.multiply(init, self.weights[self.neuron_id][index]))
-
-    def add_weight(self, weight):
-        init = 0.9063462346100909
-        self.new_current.assign_add(tf.multiply(init, self.weights[self.neuron_id][index]))
-
-    def get_total_current(self):
-        decay = 0.8187307530779818
-        time_elapsed = tf.subtract(self.dt, self.old_dt)
-        self.old_dt.assign(self.dt)
-        new_ic = self.new_current.assign_add(tf.multiply(self.old_current, tf.multiply(time_elapsed, decay)))
-        return new_ic
-
-    def get_input_current(self):
-        # Update our memory of spike times with the new spikes
-        t_spikes_op = self.add_spikes_to_current()
-
-        i_op = self.get_total_current()
-
-        self.old_current.assign(self.new_current)
-        self.new_current.assign(0.0)
-
-        return tf.add(self.i_offest, i_op)
-
-#create a network of SpiNNaker neurons
-class SpiNN_network(SpiNN_LIF_curr_exp_syn):
-    def __init__(self, weights, v_rest=-65.0, cm=1.0, tau_m=20.0, tau_refract=5.0, v_thresh=-50.0,
-                 v_reset=-65.0, i_offest=0.0):
-
-        for neuron_id in range(len(weights)):
-            super(SpiNN_network, self).__init__(weights, neuron_id, v_rest, cm, tau_m, tau_refract,
-                                                v_thresh, v_reset, np.random.random()*2)
+# class SpiNN_LIF_curr_exp_syn(SpiNN_LIF_curr_exp):
+#
+#     def __init__(self, weights, neuron_id, v_rest=-65.0, cm=1.0, tau_m=20.0, tau_refract=5.0,
+#                  v_thresh=-50.0, v_reset=-65.0, i_offest=0.0):
+#         self.n_syn = len(weights)
+#         self.neuron_id = neuron_id
+#         self.weights = weights
+#
+#         super(SpiNN_LIF_curr_exp_syn, self).__init__(v_rest, cm, tau_m, tau_refract, v_thresh, v_reset, i_offest)
+#
+#     def get_vars_and_ph(self):
+#         # Get parent grah variables and placeholders
+#         super(SpiNN_LIF_curr_exp_syn, self).get_vars_and_ph()
+#
+#         # A placeholder indicating which synapse spiked in the last time step
+#         self.syn_has_spiked = tf.placeholder(shape=[self.n_syn], dtype=tf.bool)
+#         # current information
+#         self.old_current = tf.Variable(0.0, dtype=tf.float32)
+#         self.new_current = tf.Variable(0.0, dtype=tf.float32)
+#         # the last time there was an update
+#         self.old_dt = tf.Variable(0.0, tf.float32)
+#
+#     def add_spikes_to_current(self):
+#         tf.case([self.syn_has_spiked > 0, self.add_weight(self.syn_has_spiked)])
+#         # for neuron in range(self.n_syn):
+#         #     tf.case([(self.syn_has_spiked[neuron] is True, self.add_spike(neuron))])
+#             # if self.syn_has_spiked[neuron]:
+#             #     self.add_spike(neuron)
+#
+#     def add_spike(self, index):
+#         init = 0.9063462346100909
+#         self.new_current.assign_add(tf.multiply(init, self.weights[self.neuron_id][index]))
+#
+#     def add_weight(self, weight):
+#         init = 0.9063462346100909
+#         self.new_current.assign_add(tf.multiply(init, self.weights[self.neuron_id][index]))
+#
+#     def get_total_current(self):
+#         decay = 0.8187307530779818
+#         time_elapsed = tf.subtract(self.dt, self.old_dt)
+#         self.old_dt.assign(self.dt)
+#         new_ic = self.new_current.assign_add(tf.multiply(self.old_current, tf.multiply(time_elapsed, decay)))
+#         return new_ic
+#
+#     def get_input_current(self):
+#         # Update our memory of spike times with the new spikes
+#         t_spikes_op = self.add_spikes_to_current()
+#
+#         i_op = self.get_total_current()
+#
+#         self.old_current.assign(self.new_current)
+#         self.new_current.assign(0.0)
+#
+#         return tf.add(self.i_offest, i_op)
+#
+# #create a network of SpiNNaker neurons
+# class SpiNN_network(SpiNN_LIF_curr_exp_syn):
+#     def __init__(self, weights, v_rest=-65.0, cm=1.0, tau_m=20.0, tau_refract=5.0, v_thresh=-50.0,
+#                  v_reset=-65.0, i_offest=0.0):
+#
+#         for neuron_id in range(len(weights)):
+#             super(SpiNN_network, self).__init__(weights, neuron_id, v_rest, cm, tau_m, tau_refract,
+#                                                 v_thresh, v_reset, np.random.random()*2)
 
 
 
@@ -210,19 +210,19 @@ steps = int(T / dt)
 I = []
 U = []
 
-network_size = 5
-weight_matrix = [[np.random.randint(5) for i in range(network_size)] for j in range(network_size)]
-network = SpiNN_network(weight_matrix)
-
-with tf.Session(graph=SpiNN_network.graph) as sess:
-    sess.run(tf.global_variables_initializer())
-    spike_history = [False for i in range(network_size)]
-    for step in range(steps):
-        t = step * dt
-        feed = {network.dt: dt, network.i_curr: 0.0, network.syn_has_spiked: spike_history}
-        [membrane_v, resting_period] = sess.run(network.potential, feed_dict=feed)
-        I.append(resting_period)
-        U.append(membrane_v)
+# network_size = 5
+# weight_matrix = [[np.random.randint(5) for i in range(network_size)] for j in range(network_size)]
+# network = SpiNN_network(weight_matrix)
+#
+# with tf.Session(graph=SpiNN_network.graph) as sess:
+#     sess.run(tf.global_variables_initializer())
+#     spike_history = [False for i in range(network_size)]
+#     for step in range(steps):
+#         t = step * dt
+#         feed = {network.dt: dt, network.i_curr: 0.0, network.syn_has_spiked: spike_history}
+#         [membrane_v, resting_period] = sess.run(network.potential, feed_dict=feed)
+#         I.append(resting_period)
+#         U.append(membrane_v)
 
 
 neuron = SpiNN_LIF_curr_exp()

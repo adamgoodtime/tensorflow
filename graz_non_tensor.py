@@ -11,7 +11,7 @@ class Graz_LIF(object):
         self.v_rest = v_rest #* 10**-3
         self.cm = cm #* 10**-3
         self.tau_m = tau_m #* 10**-3
-        self.r_mem = self.tau_m / cm
+        self.r_mem = 1.0 #self.tau_m / cm
         self.tau_refract = tau_refract
         self.v_thresh = v_thresh #* 10**-3
         self.v_reset = v_reset #* 10**-3
@@ -27,8 +27,11 @@ class Graz_LIF(object):
         self.received_spikes = [False for i in range(len(weights))]
 
     # activation function
-    def H(self, x):
-        return 1 / (1 + np.exp(-x))
+    def H(self, x, dev=False):
+        if dev:
+            return np.exp(-x) / ((1 + np.exp(-x))**2)
+        else:
+            return 1 / (1 + np.exp(-x))
 
     # operation to be performed when not spiking
     def integrating(self):
@@ -88,7 +91,7 @@ class Network(object):
         self.v_rest = v_rest #* 10**-3
         self.cm = cm #* 10**-3
         self.tau_m = tau_m #* 10**-3
-        self.r_mem = self.tau_m / cm
+        self.r_mem = 1.0 #self.tau_m / cm
         self.tau_refract = tau_refract
         self.v_thresh = v_thresh #* 10**-3
         self.v_reset = v_reset #* 10**-3
@@ -112,8 +115,8 @@ class Network(object):
             spike_tracking.append(neuron.has_spiked)
         self.did_it_spike = spike_tracking
 
-def calc_error(spike_history, single_error_neuron=False):
-    target_hz = 10.0
+def calc_error(spike_history, single_error_neuron=True):
+    target_hz = 0.1
     if single_error_neuron:
         actual_hz = float(sum(spike_history[number_of_neurons-1])) / float(T)
     else:
@@ -143,14 +146,17 @@ def back_prop(spike_history, voltage_history, network):
         for neuron in range(number_of_neurons):
             this_neuron = network.neuron_list[neuron]
             if spike_history[neuron][t]:
-                p_dEdz = error
+                leak = np.exp(-network.dt / network.tau_m)
+                p_dEdz = error * network.weight_matrix[neuron][number_of_neurons-1] * leak
                 sum_dEdV = sum([dEdV[n][t+1] *
-                                weight_matrix[neuron][n] *
+                                # weight_matrix[neuron][n] *
+                                weight_matrix[n][neuron] *
                                 (1-network.neuron_list[n].alpha) *
                                 this_neuron.r_mem
                                 for n in range(number_of_neurons)])
                 dEdz[neuron][t] = p_dEdz - (dEdV[neuron][t+1] * dt * this_neuron.v_thresh) + sum_dEdV
-                dEdV[neuron][t] = dEdz[neuron][t] * ((1/dt)/voltage_history[neuron][t]) * (1/this_neuron.v_thresh) + \
+                pseudo_derivative = this_neuron.H(voltage_history[neuron][t], dev=True)
+                dEdV[neuron][t] = dEdz[neuron][t] * pseudo_derivative * (1/this_neuron.v_thresh) + \
                                   (dEdV[neuron][t+1] * this_neuron.alpha)
 
     for pre in range(number_of_neurons):
@@ -158,14 +164,15 @@ def back_prop(spike_history, voltage_history, network):
             dEdWi[pre][post] = sum([dEdV[post][t] * spike_history[pre][t] for t in range(T/dt)])
             dEdWr[pre][post] = sum([dEdV[post][t] * spike_history[pre][t] for t in range(T/dt)])
 
-            new_weight_matrix[pre][post] += l_rate * dEdWi[pre][post]
+            new_weight_matrix[pre][post] += l_rate * dEdWr[pre][post]
 
     return new_weight_matrix
 
 # Network
-max_weight = 0.001
-number_of_neurons = 6
+number_of_neurons = 20
+max_weight = np.sqrt(number_of_neurons)
 weight_matrix = [[np.random.random() * max_weight for i in range(number_of_neurons)] for j in range(number_of_neurons)]
+# weight_matrix = []
 
 epochs = 100
 l_rate = 1
@@ -176,7 +183,7 @@ dt = 1
 # Number of iterations = T/dt
 steps = int(T / dt)
 plot = True
-plot = not plot
+# plot = not plot
 
 if weight_matrix:
 
@@ -207,7 +214,7 @@ if weight_matrix:
             sc = []
             spikes = []
             for neuron in network.neuron_list:
-                neuron.i_offset = np.random.random() * 0.06
+                neuron.i_offset = 1.1 * (1.0 - (float(step)/float(steps)))  # np.random.random() * 1.1#0.06
                 i.append(neuron.i_offset)
                 v.append(neuron.v)
                 sc.append(neuron.scaled_v)
