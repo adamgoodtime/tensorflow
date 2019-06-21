@@ -145,6 +145,7 @@ class Network(object):
             spike_tracking.append(neuron.has_spiked)
         self.did_they_spike = spike_tracking
 
+
 class Network_in_xor(object):
 
     def __init__(self, weight_matrix, delay_matrix, on_rate, off_rate, score_delay, xor_input, stochastic=False, excite_params={}, inhib_params={},
@@ -222,6 +223,7 @@ class Network_in_xor(object):
 
     def add_delays(self):
         # need to get rid of connection matrix as that fucks multapses
+        return "it's fucked"
 
     # step all neurons and save state
     def step(self, current_dt):
