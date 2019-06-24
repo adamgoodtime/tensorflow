@@ -27,8 +27,14 @@ class Graz_LIF(object):
         self.received_spikes = [False for i in range(len(weights))]
 
     # activation function
-    def H(self, x, dev=False):
+    def H(self, x, dev=False, heavy=True, gammma=0.1):
+        if heavy:
+            if dev:
+                return (gammma/self.dt) * max(0, 1-x)
+            else:
+                return gammma * max(0, 1 - x)
         if dev:
+            x *= 3
             return np.exp(-x) / ((1 + np.exp(-x))**2)
         else:
             return 1 / (1 + np.exp(-x))
@@ -115,63 +121,92 @@ class Network(object):
             spike_tracking.append(neuron.has_spiked)
         self.did_it_spike = spike_tracking
 
-def calc_error(spike_history, single_error_neuron=True):
-    target_hz = 0.1
+def calc_error(spike_history, single_error_neuron=True, quadratic=False):
+    target_hz = 20
     if single_error_neuron:
-        actual_hz = float(sum(spike_history[number_of_neurons-1])) / float(T)
+        actual_hz = float(sum(spike_history[number_of_neurons-1])) / (float(T) / 1000.0)
     else:
-        actual_hz = float(sum([sum(spike_history[n]) for n in range(number_of_neurons)])) / float(T)
-    error = 0.5 * (target_hz - actual_hz)**2
+        actual_hz = float(sum([sum(spike_history[n]) for n in range(number_of_neurons)])) / (float(T) / 1000.0)
+    if quadratic:
+        error = 0.5 * (target_hz - actual_hz)**2
+    else:
+        error = actual_hz - target_hz
+        # error = target_hz - actual_hz
+    print "Error for the last iteration:", error, " with target:", target_hz, "and actual:", actual_hz
     return error
 
 # error = 0.5 (y - y_target)^2
 def back_prop(spike_history, voltage_history, network):
     error = calc_error(spike_history)
-    print "Error for the last iteration is", error
     new_weight_matrix = deepcopy(network.weight_matrix)
-    # theta = 1
-    # dEdz = theta * error
-    # dzdu = 0
-    # dEdVt1 = 0
-    # dEdVt = (dEdz * dzdu / network.v_thresh) + (dEdVt1 * network.alpha)
-    # dEdzt = dEdz - (dEdVt1 * dt * network.v_thresh) + \
-    #         sum([dEdVt1 * network.weight_matrix["blah"] * (1 - network.alpha) * network.r_mem for neuron in network.neuron_list])
+    update_weight_matrix = np.zeros([number_of_neurons, number_of_neurons])
     dEdz = [[0.0 for i in range(T/dt + 1)] for neuron in range(number_of_neurons)]
     dEdV = [[0.0 for i in range(T/dt + 1)] for neuron in range(number_of_neurons)]
-    # dEdWi = [[[0.0 for i in range(T/dt + 1)] for pre in range(number_of_neurons)] for post in range(number_of_neurons)]
-    # dEdWr = [[[0.0 for i in range(T/dt + 1)] for pre in range(number_of_neurons)] for post in range(number_of_neurons)]
     dEdWi = [[0.0 for pre in range(number_of_neurons)] for post in range(number_of_neurons)]
     dEdWr = [[0.0 for pre in range(number_of_neurons)] for post in range(number_of_neurons)]
     for t in range(T/dt-1, -1, -1):
         for neuron in range(number_of_neurons):
             this_neuron = network.neuron_list[neuron]
-            if spike_history[neuron][t]:
+            pseudo_derivative = this_neuron.H(voltage_history[neuron][t], dev=True)
+            print "psd =", pseudo_derivative
+            if pseudo_derivative:
                 leak = np.exp(-network.dt / network.tau_m)
                 p_dEdz = error * network.weight_matrix[neuron][number_of_neurons-1] * leak
                 sum_dEdV = sum([dEdV[n][t+1] *
-                                # weight_matrix[neuron][n] *
-                                weight_matrix[n][neuron] *
+                                weight_matrix[neuron][n] *
+                                # weight_matrix[n][neuron] *
                                 (1-network.neuron_list[n].alpha) *
                                 this_neuron.r_mem
                                 for n in range(number_of_neurons)])
                 dEdz[neuron][t] = p_dEdz - (dEdV[neuron][t+1] * dt * this_neuron.v_thresh) + sum_dEdV
-                pseudo_derivative = this_neuron.H(voltage_history[neuron][t], dev=True)
                 dEdV[neuron][t] = dEdz[neuron][t] * pseudo_derivative * (1/this_neuron.v_thresh) + \
                                   (dEdV[neuron][t+1] * this_neuron.alpha)
 
     for pre in range(number_of_neurons):
         for post in range(number_of_neurons):
-            dEdWi[pre][post] = sum([dEdV[post][t] * spike_history[pre][t] for t in range(T/dt)])
-            dEdWr[pre][post] = sum([dEdV[post][t] * spike_history[pre][t] for t in range(T/dt)])
+            # dEdWi[pre][post] = sum([dEdV[post][t] * spike_history[pre][t] for t in range(T/dt)])
+            # dEdWr[pre][post] = sum([dEdV[post][t] * spike_history[pre][t] for t in range(T/dt)])
+            # new_weight_matrix[pre][post] += l_rate * dEdWr[pre][post]
+            # update_weight_matrix[pre][post] += l_rate * dEdWr[pre][post]
+            dEdWi[post][pre] = sum([dEdV[post][t] * spike_history[pre][t] for t in range(T/dt)])
+            dEdWr[post][pre] = sum([dEdV[post][t] * spike_history[pre][t] for t in range(T/dt)])
+            new_weight_matrix[post][pre] += l_rate * dEdWr[post][pre]
+            update_weight_matrix[post][pre] += l_rate * dEdWr[post][pre]
 
-            new_weight_matrix[pre][post] += l_rate * dEdWr[pre][post]
-
+    print "\n", network.weight_matrix
+    print update_weight_matrix
+    print new_weight_matrix
     return new_weight_matrix
 
 # Network
-number_of_neurons = 20
-max_weight = np.sqrt(number_of_neurons)
-weight_matrix = [[np.random.random() * max_weight for i in range(number_of_neurons)] for j in range(number_of_neurons)]
+# Feedforward network
+neurons_per_layer = 3
+hidden_layers = 1
+input_neurons = 0
+output_neurons = 1
+starting_weight = np.sqrt(neurons_per_layer)
+number_of_neurons = input_neurons + (hidden_layers * neurons_per_layer) + output_neurons
+weight_matrix = np.zeros([number_of_neurons, number_of_neurons])
+for i in range(input_neurons):
+    for j in range(neurons_per_layer):
+        weight_matrix[i][j+input_neurons] = starting_weight * np.random.random()
+        # print "ii=", i, "\tj=", j+input_neurons
+for i in range(hidden_layers-1):
+    for j in range(neurons_per_layer):
+        for k in range(neurons_per_layer):
+            weight_matrix[(i*neurons_per_layer)+input_neurons+k][j+((i+1)*neurons_per_layer)+input_neurons] = starting_weight * np.random.random()
+            # print "hi=", (i*neurons_per_layer)+input_neurons+k, "\tj=", j+((i+1)*neurons_per_layer)+input_neurons
+for i in range(neurons_per_layer):
+    for j in range(output_neurons):
+        weight_matrix[((hidden_layers-1)*neurons_per_layer)+input_neurons+i][number_of_neurons-j-1] = starting_weight * np.random.random()
+        # print "oi=", ((hidden_layers-1)*neurons_per_layer)+input_neurons+i, "\tj=", number_of_neurons-j-1
+# weight_matrix = np.transpose(weight_matrix).tolist()
+
+# Recurrent network
+# number_of_neurons = 20
+# max_weight = np.sqrt(number_of_neurons)
+# weight_matrix = [[np.random.random() * max_weight for i in range(number_of_neurons)] for j in
+#                  range(number_of_neurons)]
 # weight_matrix = []
 
 epochs = 100
@@ -183,9 +218,9 @@ dt = 1
 # Number of iterations = T/dt
 steps = int(T / dt)
 plot = True
-# plot = not plot
+plot = not plot
 
-if weight_matrix:
+if weight_matrix != []:
 
     for epoch in range(epochs):
 
