@@ -27,15 +27,18 @@ class Graz_LIF(object):
         self.received_spikes = [False for i in range(len(weights))]
 
     # activation function
-    def H(self, x, dev=False, heavy=True, gammma=0.1):
+    def H(self, x, dev=False, heavy=False, gammma=0.1):
         if heavy:
             if dev:
                 return (gammma/self.dt) * max(0, 1-x)
             else:
                 return gammma * max(0, 1 - x)
         if dev:
-            x *= 3
+            # x *= 3
             return np.exp(-x) / ((1 + np.exp(-x))**2)
+            value = self.H(x)
+            # print "H dev - og:", np.exp(-x) / ((1 + np.exp(-x))**2), "gb:", value / (1 - value)
+            return value / (1 - value)
         else:
             return 1 / (1 + np.exp(-x))
 
@@ -81,13 +84,6 @@ class Graz_LIF(object):
         else:
             self.integrating()
 
-    def return_differentials(self, error):
-        dEdz = error
-        dzdu = 0
-        dEdVt1 = 0
-        dEdVt = (dEdz * dzdu / network.v_thresh) + (dEdVt1 * self.alpha)
-        dEdzt = dEdz - (dEdVt1 * dt * self.v_thresh) + (dEdVt1 * self.weights["blah"] * (1 - self.alpha) * self.r_mem)
-
 class Network(object):
 
     def __init__(self, weight_matrix, dt=1.0, v_rest=0.0, cm=1.0, tau_m=20.0, tau_refract=5.0, v_thresh=1.0, v_reset=0.0, i_offset=0.0):
@@ -110,7 +106,7 @@ class Network(object):
 
         # initialise the network of neurons connected
         for neuron in range(self.number_of_neurons):
-            self.neuron_list.append(Graz_LIF(self.weight_matrix[neuron], dt, v_rest, cm, tau_m, tau_refract, v_thresh, v_reset, i_offset, self.alpha))
+            self.neuron_list.append(Graz_LIF(np.take(self.weight_matrix, neuron, axis=1), dt, v_rest, cm, tau_m, tau_refract, v_thresh, v_reset, i_offset, self.alpha))
 
     # step all neurons and save state
     def step(self):
@@ -135,9 +131,11 @@ def calc_error(spike_history, single_error_neuron=True, quadratic=False):
     print "Error for the last iteration:", error, " with target:", target_hz, "and actual:", actual_hz
     return error
 
+error_tracker = []
 # error = 0.5 (y - y_target)^2
 def back_prop(spike_history, voltage_history, network):
     error = calc_error(spike_history)
+    error_tracker.append(error)
     new_weight_matrix = deepcopy(network.weight_matrix)
     update_weight_matrix = np.zeros([number_of_neurons, number_of_neurons])
     dEdz = [[0.0 for i in range(T/dt + 1)] for neuron in range(number_of_neurons)]
@@ -148,10 +146,18 @@ def back_prop(spike_history, voltage_history, network):
         for neuron in range(number_of_neurons):
             this_neuron = network.neuron_list[neuron]
             pseudo_derivative = this_neuron.H(voltage_history[neuron][t], dev=True)
-            print "psd =", pseudo_derivative
+            dfm1 = 0
+            dfp1 = 0
+            if t != 0:
+                dfm1 = (this_neuron.H(voltage_history[neuron][t-1]) - this_neuron.H(voltage_history[neuron][t])) #/ (dt / 1000.0)
+            if t != T/dt - 1:
+                dfp1 = (this_neuron.H(voltage_history[neuron][t]) - this_neuron.H(voltage_history[neuron][t+1])) #/ (dt / 1000.0)
+            print "\npsd =", pseudo_derivative, "df-1 =", dfm1, "df+1 =", dfp1
+            print "diff-1 =", np.log10(np.abs(pseudo_derivative - dfm1) + 1e-20), "diff+1 =", np.log10(np.abs(pseudo_derivative - dfp1) + 1e-20)
+            # pseudo_derivative = dfm1
             if pseudo_derivative:
                 leak = np.exp(-network.dt / network.tau_m)
-                p_dEdz = error * network.weight_matrix[neuron][number_of_neurons-1] * leak
+                p_dEdz = error * leak #* network.weight_matrix[neuron][number_of_neurons-1]
                 sum_dEdV = sum([dEdV[n][t+1] *
                                 weight_matrix[neuron][n] *
                                 # weight_matrix[n][neuron] *
@@ -164,14 +170,17 @@ def back_prop(spike_history, voltage_history, network):
 
     for pre in range(number_of_neurons):
         for post in range(number_of_neurons):
-            # dEdWi[pre][post] = sum([dEdV[post][t] * spike_history[pre][t] for t in range(T/dt)])
-            # dEdWr[pre][post] = sum([dEdV[post][t] * spike_history[pre][t] for t in range(T/dt)])
-            # new_weight_matrix[pre][post] += l_rate * dEdWr[pre][post]
-            # update_weight_matrix[pre][post] += l_rate * dEdWr[pre][post]
-            dEdWi[post][pre] = sum([dEdV[post][t] * spike_history[pre][t] for t in range(T/dt)])
-            dEdWr[post][pre] = sum([dEdV[post][t] * spike_history[pre][t] for t in range(T/dt)])
-            new_weight_matrix[post][pre] += l_rate * dEdWr[post][pre]
-            update_weight_matrix[post][pre] += l_rate * dEdWr[post][pre]
+            if new_weight_matrix[pre][post]:
+                dEdWi[pre][post] = sum([dEdV[post][t] * spike_history[pre][t] for t in range(T/dt)])
+                dEdWr[pre][post] = sum([dEdV[post][t] * spike_history[pre][t] for t in range(T/dt)])
+                dEdWr[pre][post] = error / dEdWr[pre][post]
+                new_weight_matrix[pre][post] += l_rate * dEdWr[pre][post]
+                update_weight_matrix[pre][post] += l_rate * dEdWr[pre][post]
+                # dEdWi[post][pre] = sum([dEdV[post][t] * spike_history[pre][t] for t in range(T/dt)])
+                # dEdWr[post][pre] = sum([dEdV[post][t] * spike_history[pre][t] for t in range(T/dt)])
+                # new_weight_matrix[post][pre] += l_rate * dEdWr[post][pre]
+                # update_weight_matrix[post][pre] += l_rate * dEdWr[post][pre]
+
 
     print "\n", network.weight_matrix
     print update_weight_matrix
@@ -180,11 +189,11 @@ def back_prop(spike_history, voltage_history, network):
 
 # Network
 # Feedforward network
-neurons_per_layer = 3
+neurons_per_layer = 2
 hidden_layers = 1
 input_neurons = 0
 output_neurons = 1
-starting_weight = np.sqrt(neurons_per_layer)
+starting_weight = np.sqrt(neurons_per_layer) / 2
 number_of_neurons = input_neurons + (hidden_layers * neurons_per_layer) + output_neurons
 weight_matrix = np.zeros([number_of_neurons, number_of_neurons])
 for i in range(input_neurons):
@@ -210,9 +219,9 @@ for i in range(neurons_per_layer):
 # weight_matrix = []
 
 epochs = 100
-l_rate = 1
+l_rate = 0.01
 # Duration of the simulation in ms
-T = 200
+T = 2000
 # Duration of each time step in ms
 dt = 1
 # Number of iterations = T/dt
@@ -248,8 +257,9 @@ if weight_matrix != []:
             v = []
             sc = []
             spikes = []
-            for neuron in network.neuron_list:
-                neuron.i_offset = 1.1 * (1.0 - (float(step)/float(steps)))  # np.random.random() * 1.1#0.06
+            for idx, neuron in enumerate(network.neuron_list):
+                if idx < number_of_neurons - 1:
+                    neuron.i_offset = 1.05 #* (2.0 - (float(step)/float(steps))) / 2  # np.random.random() * 1.1#0.06
                 i.append(neuron.i_offset)
                 v.append(neuron.v)
                 sc.append(neuron.scaled_v)
@@ -293,6 +303,8 @@ if weight_matrix != []:
             plt.xlabel('Time (msec)')
             plt.scatter(spike_history_time, spike_history_index)
             plt.show()
+
+    print "\n", error_tracker
 
 else:
     # Output variables
