@@ -45,10 +45,10 @@ def check_gradient(f, df, x0, tries=10, deltas=(1e-2, 1e-4, 1e-6)):
 
 
 if __name__ == "__main__":
-    w0 = np.random.randn(1)
+    w0 = np.random.randn(3)
     # f = lambda w: 0.5 * np.sum(w ** 2)
     # df = lambda w: w
-    f = lambda x: 1 / (1 + np.exp(-x))
+    f = lambda x: np.sum(1 / (1 + np.exp(-x)))
     df = lambda x: np.exp(-x) / ((1 + np.exp(-x))**2)
-    df = lambda x: f(x) * (1 - f(x))
+    # df = lambda x: f(x) * (1 - f(x))
     check_gradient(f, df, w0)

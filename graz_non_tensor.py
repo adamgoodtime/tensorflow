@@ -30,15 +30,15 @@ class Graz_LIF(object):
     def H(self, x, dev=False, heavy=False, gammma=0.1):
         if heavy:
             if dev:
-                return (gammma/self.dt) * max(0, 1-x)
+                return (gammma/self.dt) * max(0, 1-abs(x))
             else:
-                return gammma * max(0, 1 - x)
+                return gammma * max(0, 1 - abs(x))
         if dev:
             # x *= 3
             return np.exp(-x) / ((1 + np.exp(-x))**2)
             value = self.H(x)
             # print "H dev - og:", np.exp(-x) / ((1 + np.exp(-x))**2), "gb:", value / (1 - value)
-            return value / (1 - value)
+            return value * (1 - value)
         else:
             return 1 / (1 + np.exp(-x))
 
@@ -103,6 +103,7 @@ class Network(object):
         self.number_of_neurons = len(weight_matrix)
         self.neuron_list = []
         self.did_it_spike = [False for i in range(self.number_of_neurons)]
+        # matrix multiplication of w[] and z[]
 
         # initialise the network of neurons connected
         for neuron in range(self.number_of_neurons):
@@ -146,15 +147,6 @@ def back_prop(spike_history, voltage_history, network):
         for neuron in range(number_of_neurons):
             this_neuron = network.neuron_list[neuron]
             pseudo_derivative = this_neuron.H(voltage_history[neuron][t], dev=True)
-            dfm1 = 0
-            dfp1 = 0
-            if t != 0:
-                dfm1 = (this_neuron.H(voltage_history[neuron][t-1]) - this_neuron.H(voltage_history[neuron][t])) #/ (dt / 1000.0)
-            if t != T/dt - 1:
-                dfp1 = (this_neuron.H(voltage_history[neuron][t]) - this_neuron.H(voltage_history[neuron][t+1])) #/ (dt / 1000.0)
-            print "\npsd =", pseudo_derivative, "df-1 =", dfm1, "df+1 =", dfp1
-            print "diff-1 =", np.log10(np.abs(pseudo_derivative - dfm1) + 1e-20), "diff+1 =", np.log10(np.abs(pseudo_derivative - dfp1) + 1e-20)
-            # pseudo_derivative = dfm1
             if pseudo_derivative:
                 leak = np.exp(-network.dt / network.tau_m)
                 p_dEdz = error * leak #* network.weight_matrix[neuron][number_of_neurons-1]
@@ -173,9 +165,9 @@ def back_prop(spike_history, voltage_history, network):
             if new_weight_matrix[pre][post]:
                 dEdWi[pre][post] = sum([dEdV[post][t] * spike_history[pre][t] for t in range(T/dt)])
                 dEdWr[pre][post] = sum([dEdV[post][t] * spike_history[pre][t] for t in range(T/dt)])
-                dEdWr[pre][post] = error / dEdWr[pre][post]
-                new_weight_matrix[pre][post] += l_rate * dEdWr[pre][post]
-                update_weight_matrix[pre][post] += l_rate * dEdWr[pre][post]
+                # dEdWr[pre][post] = error / dEdWr[pre][post]
+                new_weight_matrix[pre][post] -= l_rate * dEdWr[pre][post]
+                update_weight_matrix[pre][post] -= l_rate * dEdWr[pre][post]
                 # dEdWi[post][pre] = sum([dEdV[post][t] * spike_history[pre][t] for t in range(T/dt)])
                 # dEdWr[post][pre] = sum([dEdV[post][t] * spike_history[pre][t] for t in range(T/dt)])
                 # new_weight_matrix[post][pre] += l_rate * dEdWr[post][pre]
