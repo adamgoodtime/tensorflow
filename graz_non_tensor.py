@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from copy import deepcopy
+from gradient_test import check_gradient
 
 class Graz_LIF(object):
 
@@ -87,7 +88,7 @@ class Graz_LIF(object):
 class Network(object):
 
     def __init__(self, weight_matrix, dt=1.0, v_rest=0.0, cm=1.0, tau_m=20.0, tau_refract=5.0, v_thresh=1.0, v_reset=0.0, i_offset=0.0):
-        self.alpha = dt / tau_m
+        self.alpha = np.exp(- dt / tau_m)
         # neuron variable
         self.dt = dt
         self.v_rest = v_rest #* 10**-3
@@ -174,44 +175,44 @@ def back_prop(spike_history, voltage_history, network):
                 # update_weight_matrix[post][pre] += l_rate * dEdWr[post][pre]
 
 
-    print "\n", network.weight_matrix
-    print update_weight_matrix
-    print new_weight_matrix
+    print "\noriginal\n", network.weight_matrix
+    print "update\n", update_weight_matrix
+    print "new\n", new_weight_matrix
     return new_weight_matrix
 
 # Network
 # Feedforward network
-neurons_per_layer = 2
-hidden_layers = 1
+neurons_per_layer = 8
+hidden_layers = 2
 input_neurons = 0
 output_neurons = 1
-starting_weight = np.sqrt(neurons_per_layer) / 2
+weight_scale = np.sqrt(neurons_per_layer)
 number_of_neurons = input_neurons + (hidden_layers * neurons_per_layer) + output_neurons
 weight_matrix = np.zeros([number_of_neurons, number_of_neurons])
 for i in range(input_neurons):
     for j in range(neurons_per_layer):
-        weight_matrix[i][j+input_neurons] = starting_weight * np.random.random()
+        weight_matrix[i][j+input_neurons] = np.random.randn() / weight_scale
         # print "ii=", i, "\tj=", j+input_neurons
 for i in range(hidden_layers-1):
     for j in range(neurons_per_layer):
         for k in range(neurons_per_layer):
-            weight_matrix[(i*neurons_per_layer)+input_neurons+k][j+((i+1)*neurons_per_layer)+input_neurons] = starting_weight * np.random.random()
+            weight_matrix[(i*neurons_per_layer)+input_neurons+k][j+((i+1)*neurons_per_layer)+input_neurons] = np.random.randn() / weight_scale
             # print "hi=", (i*neurons_per_layer)+input_neurons+k, "\tj=", j+((i+1)*neurons_per_layer)+input_neurons
 for i in range(neurons_per_layer):
     for j in range(output_neurons):
-        weight_matrix[((hidden_layers-1)*neurons_per_layer)+input_neurons+i][number_of_neurons-j-1] = starting_weight * np.random.random()
+        weight_matrix[((hidden_layers-1)*neurons_per_layer)+input_neurons+i][number_of_neurons-j-1] = np.random.randn() / weight_scale
         # print "oi=", ((hidden_layers-1)*neurons_per_layer)+input_neurons+i, "\tj=", number_of_neurons-j-1
 # weight_matrix = np.transpose(weight_matrix).tolist()
 
 # Recurrent network
 # number_of_neurons = 20
-# max_weight = np.sqrt(number_of_neurons)
-# weight_matrix = [[np.random.random() * max_weight for i in range(number_of_neurons)] for j in
+# weight_scale = np.sqrt(number_of_neurons)
+# weight_matrix = [[np.random.randn() / weight_scale for i in range(number_of_neurons)] for j in
 #                  range(number_of_neurons)]
 # weight_matrix = []
 
 epochs = 100
-l_rate = 0.01
+l_rate = 0.0001
 # Duration of the simulation in ms
 T = 2000
 # Duration of each time step in ms
@@ -249,9 +250,10 @@ if weight_matrix != []:
             v = []
             sc = []
             spikes = []
+            np.random.seed(272727)
             for idx, neuron in enumerate(network.neuron_list):
                 if idx < number_of_neurons - 1:
-                    neuron.i_offset = 1.05 #* (2.0 - (float(step)/float(steps))) / 2  # np.random.random() * 1.1#0.06
+                    neuron.i_offset = 2 * np.random.random() #* (2.0 - (float(step)/float(steps))) / 2  # np.random.random() * 1.1#0.06
                 i.append(neuron.i_offset)
                 v.append(neuron.v)
                 sc.append(neuron.scaled_v)
@@ -305,6 +307,9 @@ else:
 
     neuron = Graz_LIF(weights=[], dt=dt, tau_refract=0)
 
+    spike_history_index = []
+    spike_history_time = []
+
     for step in range(steps):
 
         t = step * dt
@@ -317,10 +322,14 @@ else:
             i_app = 0.08
         else:
             i_app = 0.0
-        i_app = np.random.random() * 0.1
+        i_app = 1.05  # np.random.random() * 0.1
 
         neuron.i_offset = i_app
         neuron.step()
+
+        if neuron.has_spiked:
+            spike_history_index.append(1)
+            spike_history_time.append(t)
 
         I.append(i_app)
         U.append(neuron.v)
@@ -340,6 +349,12 @@ else:
     plt.title('LIF response')
     plt.ylabel('Membrane Potential (mV)')
     plt.xlabel('Time (msec)')
+    plt.figure()
+    plt.axis([0, T, -0.5, number_of_neurons])
+    plt.title('Synaptic spikes')
+    plt.ylabel('spikes')
+    plt.xlabel('Time (msec)')
+    plt.scatter(spike_history_time, spike_history_index)
     plt.show()
 
 print "done"
