@@ -26,6 +26,7 @@ class Graz_LIF(object):
         self.weights = weights
         self.has_spiked = False
         self.received_spikes = [False for i in range(len(weights))]
+        self.can_it_spike = True
 
     # activation function
     def H(self, x, dev=False, heavy=False, gammma=0.1):
@@ -78,7 +79,7 @@ class Graz_LIF(object):
 
     # step the neuron
     def step(self):
-        if self.v > self.v_thresh:
+        if self.v > self.v_thresh and self.can_it_spike:
             self.spiked()
         elif self.t_rest > 0:
             self.refracting()
@@ -119,10 +120,46 @@ class Network(object):
             spike_tracking.append(neuron.has_spiked)
         self.did_it_spike = spike_tracking
 
-def calc_error(spike_history, single_error_neuron=True, quadratic=False):
+def gradients(spike_history, voltage_history, network):
+    voltage_history = [[-1.0 for i in range(len(spike_history[0]))] for j in range(len(spike_history))]
+    voltage_history = [[-1.0, 0.0], [-1.0, 0.0]]
+    error = hz_error(spike_history)
+    error_tracker.append(error)
+    new_weight_matrix = deepcopy(network.weight_matrix)
+    update_weight_matrix = np.zeros([number_of_neurons, number_of_neurons])
+    dEdz = [[0.0 for i in range(len(spike_history[0]) + 1)] for neuron in range(number_of_neurons)]
+    dEdV = [[0.0 for i in range(len(spike_history[0]) + 1)] for neuron in range(number_of_neurons)]
+    dEdWi = [[0.0 for pre in range(number_of_neurons)] for post in range(number_of_neurons)]
+    dEdWr = [[0.0 for pre in range(number_of_neurons)] for post in range(number_of_neurons)]
+    for t in range(len(spike_history[0])-1, -1, -1):
+        for neuron in range(number_of_neurons):
+            this_neuron = network.neuron_list[neuron]
+            pseudo_derivative = this_neuron.H(voltage_history[neuron][t], dev=True)
+            if pseudo_derivative:
+                leak = np.exp(-network.dt / network.tau_m)
+                p_dEdz = error #* leak #* network.weight_matrix[neuron][number_of_neurons-1]
+                sum_dEdV = sum([dEdV[n][t+1] *
+                                weight_matrix[neuron][n] *
+                                (1-network.neuron_list[n].alpha) *
+                                this_neuron.r_mem
+                                for n in range(number_of_neurons)])
+                dEdz[neuron][t] = p_dEdz - (dEdV[neuron][t+1] * dt * this_neuron.v_thresh) + sum_dEdV
+                dEdV[neuron][t] = dEdz[neuron][t] * pseudo_derivative * (1/this_neuron.v_thresh) + \
+                                  (dEdV[neuron][t+1] * this_neuron.alpha)
+
+    for pre in range(number_of_neurons):
+        for post in range(number_of_neurons):
+            dEdWi[pre][post] = sum([dEdV[post][t] * spike_history[pre][t] for t in range(len(spike_history[0]))])
+            dEdWr[pre][post] = sum([dEdV[post][t] * spike_history[pre][t] for t in range(len(spike_history[0]))])
+            new_weight_matrix[pre][post] -= l_rate * dEdWr[pre][post]
+            update_weight_matrix[pre][post] -= l_rate * dEdWr[pre][post]
+
+    return dEdWr
+
+def hz_error(spike_history, single_error_neuron=True, quadratic=False):
     target_hz = 20
     if single_error_neuron:
-        actual_hz = float(sum(spike_history[number_of_neurons-1])) / (float(T) / 1000.0)
+        actual_hz = float(sum(spike_history[number_of_neurons-1])) / (float(len(spike_history[number_of_neurons-1])) * (dt / 1000.0))
     else:
         actual_hz = float(sum([sum(spike_history[n]) for n in range(number_of_neurons)])) / (float(T) / 1000.0)
     if quadratic:
@@ -133,11 +170,26 @@ def calc_error(spike_history, single_error_neuron=True, quadratic=False):
     print "Error for the last iteration:", error, " with target:", target_hz, "and actual:", actual_hz
     return error
 
+def sine_error(voltage_history, quadratic=False):
+    error = 0.0
+    if quadratic:
+        error = [0.5 * (target_sine_wave[t] - (voltage_history[number_of_neurons-1][t] + 1))**2 for t in range(T)]
+    else:
+        error = [(voltage_history[number_of_neurons-1][t] + 1) - target_sine_wave[t] for t in range(T)]
+        # error = target_hz - actual_hz
+    print "Error for the last iteration:", sum(error)
+    return error
+
 error_tracker = []
 # error = 0.5 (y - y_target)^2
 def back_prop(spike_history, voltage_history, network):
-    error = calc_error(spike_history)
-    error_tracker.append(error)
+    global error_tracker
+    if optimize == 'sine':
+        error = sine_error(voltage_history)
+        error_tracker.append(sum([abs(error[i]) for i in range(len(error))]))
+    else:
+        error = hz_error(spike_history)
+        error_tracker.append(error)
     new_weight_matrix = deepcopy(network.weight_matrix)
     update_weight_matrix = np.zeros([number_of_neurons, number_of_neurons])
     dEdz = [[0.0 for i in range(T/dt + 1)] for neuron in range(number_of_neurons)]
@@ -150,10 +202,13 @@ def back_prop(spike_history, voltage_history, network):
             pseudo_derivative = this_neuron.H(voltage_history[neuron][t], dev=True)
             if pseudo_derivative:
                 leak = np.exp(-network.dt / network.tau_m)
-                p_dEdz = error * leak #* network.weight_matrix[neuron][number_of_neurons-1]
+                if optimize == 'sine':
+                    p_dEdz = error[t] * leak * network.weight_matrix[neuron][number_of_neurons-1]
+                    # p_dEdz = sum(error) * leak #* network.weight_matrix[neuron][number_of_neurons-1]
+                else:
+                    p_dEdz = error * leak #* network.weight_matrix[neuron][number_of_neurons-1]
                 sum_dEdV = sum([dEdV[n][t+1] *
                                 weight_matrix[neuron][n] *
-                                # weight_matrix[n][neuron] *
                                 (1-network.neuron_list[n].alpha) *
                                 this_neuron.r_mem
                                 for n in range(number_of_neurons)])
@@ -166,24 +221,20 @@ def back_prop(spike_history, voltage_history, network):
             if new_weight_matrix[pre][post]:
                 dEdWi[pre][post] = sum([dEdV[post][t] * spike_history[pre][t] for t in range(T/dt)])
                 dEdWr[pre][post] = sum([dEdV[post][t] * spike_history[pre][t] for t in range(T/dt)])
-                # dEdWr[pre][post] = error / dEdWr[pre][post]
                 new_weight_matrix[pre][post] -= l_rate * dEdWr[pre][post]
                 update_weight_matrix[pre][post] -= l_rate * dEdWr[pre][post]
-                # dEdWi[post][pre] = sum([dEdV[post][t] * spike_history[pre][t] for t in range(T/dt)])
-                # dEdWr[post][pre] = sum([dEdV[post][t] * spike_history[pre][t] for t in range(T/dt)])
-                # new_weight_matrix[post][pre] += l_rate * dEdWr[post][pre]
-                # update_weight_matrix[post][pre] += l_rate * dEdWr[post][pre]
 
 
     print "\noriginal\n", network.weight_matrix
     print "update\n", update_weight_matrix
     print "new\n", new_weight_matrix
+    print "error", error_tracker[len(error_tracker)-1], "with LR", l_rate
     return new_weight_matrix
 
 # Network
 # Feedforward network
-neurons_per_layer = 8
-hidden_layers = 2
+neurons_per_layer = 1
+hidden_layers = 1
 input_neurons = 0
 output_neurons = 1
 weight_scale = np.sqrt(neurons_per_layer)
@@ -205,22 +256,29 @@ for i in range(neurons_per_layer):
 # weight_matrix = np.transpose(weight_matrix).tolist()
 
 # Recurrent network
-# number_of_neurons = 20
+# number_of_neurons = 40
 # weight_scale = np.sqrt(number_of_neurons)
 # weight_matrix = [[np.random.randn() / weight_scale for i in range(number_of_neurons)] for j in
 #                  range(number_of_neurons)]
 # weight_matrix = []
 
 epochs = 100
-l_rate = 0.0001
+l_rate = 0.1
+max_l_rate = 0.0001
+min_l_rate = 0.00001
 # Duration of the simulation in ms
-T = 2000
+T = 1
 # Duration of each time step in ms
 dt = 1
 # Number of iterations = T/dt
 steps = int(T / dt)
 plot = True
 plot = not plot
+end_at_best = True
+
+optimize = 'hz'
+target_sine = lambda x: 0.25 * (np.sin(100 * x)) + 0.25
+target_sine_wave = [target_sine(t/1000.0) for t in range(T)]
 
 if weight_matrix != []:
 
@@ -235,6 +293,7 @@ if weight_matrix != []:
         scaled_V = []
         spike_history_index = []
         spike_history_time = []
+        l_rate = min_l_rate + ((1 - (float(epoch) / float(epochs))) * (max_l_rate - min_l_rate))
 
         for step in range(steps):
 
@@ -254,6 +313,9 @@ if weight_matrix != []:
             for idx, neuron in enumerate(network.neuron_list):
                 if idx < number_of_neurons - 1:
                     neuron.i_offset = 2 * np.random.random() #* (2.0 - (float(step)/float(steps))) / 2  # np.random.random() * 1.1#0.06
+                else:
+                    if optimize == 'sine':
+                        neuron.can_it_spike = False
                 i.append(neuron.i_offset)
                 v.append(neuron.v)
                 sc.append(neuron.scaled_v)
@@ -273,6 +335,10 @@ if weight_matrix != []:
         all_spikes = np.transpose(all_spikes).tolist()
 
         weight_matrix = back_prop(all_spikes, scaled_V, network)
+        print "epoch", epoch, "/", epochs
+
+        df = lambda x: gradients(x, scaled_V, network)
+        check_gradient(f=hz_error, df=df, x0=all_spikes)
 
         if plot or epoch == 0 or epoch == epochs-1:
             plt.rcParams["figure.figsize"] = (12, 6)
@@ -286,6 +352,8 @@ if weight_matrix != []:
             plt.figure()
             for neuron in range(number_of_neurons):
                 plt.plot([v for v in V[neuron]])
+            if optimize == 'sine':
+                plt.plot(target_sine_wave)
             plt.axhline(y=network.v_thresh, color='r', linestyle='-')
             plt.title('LIF response')
             plt.ylabel('Membrane Potential (mV)')
@@ -297,6 +365,33 @@ if weight_matrix != []:
             plt.xlabel('Time (msec)')
             plt.scatter(spike_history_time, spike_history_index)
             plt.show()
+
+        if abs(error_tracker[len(error_tracker)-1]) < 0.1 and end_at_best:
+            plt.rcParams["figure.figsize"] = (12, 6)
+            # Draw the input current and the membrane potential
+            plt.figure()
+            for neuron in range(number_of_neurons):
+                plt.plot([i for i in I[neuron]])
+            plt.title('Square input stimuli')
+            plt.ylabel('Input current (I)')
+            plt.xlabel('Time (msec)')
+            plt.figure()
+            for neuron in range(number_of_neurons):
+                plt.plot([v for v in V[neuron]])
+            if optimize == 'sine':
+                plt.plot(target_sine_wave)
+            plt.axhline(y=network.v_thresh, color='r', linestyle='-')
+            plt.title('LIF response')
+            plt.ylabel('Membrane Potential (mV)')
+            plt.xlabel('Time (msec)')
+            plt.figure()
+            plt.axis([0, T, -0.5, number_of_neurons])
+            plt.title('Synaptic spikes')
+            plt.ylabel('spikes')
+            plt.xlabel('Time (msec)')
+            plt.scatter(spike_history_time, spike_history_index)
+            plt.show()
+            break
 
     print "\n", error_tracker
 

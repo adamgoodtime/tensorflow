@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def check_gradient(f, df, x0, tries=10, deltas=(1e-2, 1e-4, 1e-6)):
+def check_gradient(f, df, x0, tries=10, deltas=(1e-3, 1e-3, 1e-3)):
     # Init around the point x0
     f0 = f(x0)
     g0 = df(x0)
@@ -9,17 +9,27 @@ def check_gradient(f, df, x0, tries=10, deltas=(1e-2, 1e-4, 1e-6)):
     # For different variations tries if the gradient is well approximated with finite difference
     for k_dx in range(tries):
         # random steps
-        dx = np.random.randn(x0.size)
+        dx = np.random.randn(x0[0].__len__(), x0.__len__())
+        dx = np.random.choice(a=[False, True], size=(x0[0].__len__(), x0.__len__()))#, p=[p, 1-p])
+
+        # new_x0 = []
+        # for value in x0:
+        #     new_x0.append(value.append(np.random.choice(a=[True, True])))
+        x0[0].append(True)
+        x0[1].append(True)
 
         # initialise error
         approx_err = np.zeros(len(deltas))
         # find df at random points dx
         df_g = np.inner(dx, g0)
+        df_g_x0 = df(x0)
+        df_g = sum(sum(np.array(df_g_x0)))
 
         # loop through the different deltas
         for k, d in enumerate(deltas):
             # calculate the value at the next point
-            f1 = f(x0 + d * dx)
+            # f1 = f(x0 + d * dx)
+            f1 = f(x0)
             # approximate the change in value between the 2 points
             df = (f1 - f0) / d
 
@@ -42,6 +52,8 @@ def check_gradient(f, df, x0, tries=10, deltas=(1e-2, 1e-4, 1e-6)):
 
                 \t \t  eta \t \t \t {}
                 log10( |D(eta) - df|) \t {} '''.format(d, df, df_g, deltas, approx_err))
+
+    return "done"
 
 
 if __name__ == "__main__":
