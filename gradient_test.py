@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def check_gradient(f, df, x0, tries=10, deltas=(1e-3, 1e-3, 1e-3)):
+def check_gradient(f, df, x0, tries=10, deltas=(1e-2, 1e-3, 1e-4)):
     # Init around the point x0
     f0 = f(x0)
     g0 = df(x0)
@@ -34,6 +34,7 @@ def check_gradient(f, df, x0, tries=10, deltas=(1e-3, 1e-3, 1e-3)):
             df = (f1 - f0) / d
 
             # compare the approximate change in df with actual change
+            df_g = sum(sum(np.array(df_g_x0))) / d
             approx_err[k] = np.log10(np.abs(df_g - df) + 1e-20)
 
         # if difference is small enough give all clear

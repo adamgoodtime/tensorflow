@@ -122,8 +122,9 @@ class Network(object):
 
 def gradients(spike_history, voltage_history, network):
     voltage_history = [[-1.0 for i in range(len(spike_history[0]))] for j in range(len(spike_history))]
-    voltage_history = [[-1.0, 0.0], [-1.0, 0.0]]
-    error = hz_error(spike_history)
+    second_voltage = 0.0
+    voltage_history = [[-1.0, second_voltage], [-1.0, second_voltage]]
+    error = hz_error(spike_history, quadratic=False)
     error_tracker.append(error)
     new_weight_matrix = deepcopy(network.weight_matrix)
     update_weight_matrix = np.zeros([number_of_neurons, number_of_neurons])
@@ -156,7 +157,7 @@ def gradients(spike_history, voltage_history, network):
 
     return dEdWr
 
-def hz_error(spike_history, single_error_neuron=True, quadratic=False):
+def hz_error(spike_history, single_error_neuron=True, quadratic=True):
     target_hz = 20
     if single_error_neuron:
         actual_hz = float(sum(spike_history[number_of_neurons-1])) / (float(len(spike_history[number_of_neurons-1])) * (dt / 1000.0))
@@ -188,7 +189,7 @@ def back_prop(spike_history, voltage_history, network):
         error = sine_error(voltage_history)
         error_tracker.append(sum([abs(error[i]) for i in range(len(error))]))
     else:
-        error = hz_error(spike_history)
+        error = hz_error(spike_history, quadratic=False)
         error_tracker.append(error)
     new_weight_matrix = deepcopy(network.weight_matrix)
     update_weight_matrix = np.zeros([number_of_neurons, number_of_neurons])
@@ -267,7 +268,7 @@ l_rate = 0.1
 max_l_rate = 0.0001
 min_l_rate = 0.00001
 # Duration of the simulation in ms
-T = 1
+T = 200
 # Duration of each time step in ms
 dt = 1
 # Number of iterations = T/dt
@@ -328,6 +329,9 @@ if weight_matrix != []:
                 if spikes[neuron]:
                     spike_history_index.append(neuron)
                     spike_history_time.append(t)
+
+            df = lambda x: gradients(x, np.transpose(scaled_V).tolist(), network)
+            check_gradient(f=hz_error, df=df, x0=np.transpose(all_spikes).tolist())
 
         I = np.transpose(I).tolist()
         V = np.transpose(V).tolist()
