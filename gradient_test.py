@@ -1,5 +1,8 @@
 import numpy as np
 
+# input is weights to both functions
+# target hz - z * pseudo_Dev * pre_synap spike + c + (1 - alpha)
+
 
 def check_gradient(f, df, x0, tries=10, deltas=(1e-2, 1e-3, 1e-4)):
     # Init around the point x0

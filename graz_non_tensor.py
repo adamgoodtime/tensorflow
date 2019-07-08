@@ -123,7 +123,7 @@ class Network(object):
 def gradients(spike_history, voltage_history, network):
     voltage_history = [[-1.0 for i in range(len(spike_history[0]))] for j in range(len(spike_history))]
     second_voltage = 0.0
-    voltage_history = [[-1.0, second_voltage], [-1.0, second_voltage]]
+    # voltage_history = [[-1.0, second_voltage], [-1.0, second_voltage]]
     error = hz_error(spike_history, quadratic=False)
     error_tracker.append(error)
     new_weight_matrix = deepcopy(network.weight_matrix)
@@ -150,8 +150,8 @@ def gradients(spike_history, voltage_history, network):
 
     for pre in range(number_of_neurons):
         for post in range(number_of_neurons):
-            dEdWi[pre][post] = sum([dEdV[post][t] * spike_history[pre][t] for t in range(len(spike_history[0]))])
-            dEdWr[pre][post] = sum([dEdV[post][t] * spike_history[pre][t] for t in range(len(spike_history[0]))])
+            dEdWi[pre][post] = sum([dEdV[post][t] * spike_history[pre][t] for t in range(len(spike_history[0])-1)])
+            dEdWr[pre][post] = sum([dEdV[post][t] * spike_history[pre][t] for t in range(len(spike_history[0])-1)])
             new_weight_matrix[pre][post] -= l_rate * dEdWr[pre][post]
             update_weight_matrix[pre][post] -= l_rate * dEdWr[pre][post]
 
@@ -257,16 +257,16 @@ for i in range(neurons_per_layer):
 # weight_matrix = np.transpose(weight_matrix).tolist()
 
 # Recurrent network
-# number_of_neurons = 40
-# weight_scale = np.sqrt(number_of_neurons)
-# weight_matrix = [[np.random.randn() / weight_scale for i in range(number_of_neurons)] for j in
-#                  range(number_of_neurons)]
+number_of_neurons = 30
+weight_scale = np.sqrt(number_of_neurons)
+weight_matrix = [[np.random.randn() / weight_scale for i in range(number_of_neurons)] for j in
+                 range(number_of_neurons)]
 # weight_matrix = []
 
 epochs = 100
 l_rate = 0.1
-max_l_rate = 0.0001
-min_l_rate = 0.00001
+max_l_rate = 0.001
+min_l_rate = 0.0001
 # Duration of the simulation in ms
 T = 200
 # Duration of each time step in ms
@@ -330,8 +330,8 @@ if weight_matrix != []:
                     spike_history_index.append(neuron)
                     spike_history_time.append(t)
 
-            df = lambda x: gradients(x, np.transpose(scaled_V).tolist(), network)
-            check_gradient(f=hz_error, df=df, x0=np.transpose(all_spikes).tolist())
+            # df = lambda x: gradients(x, np.transpose(scaled_V).tolist(), network)
+            # check_gradient(f=hz_error, df=df, x0=np.transpose(all_spikes).tolist())
 
         I = np.transpose(I).tolist()
         V = np.transpose(V).tolist()
