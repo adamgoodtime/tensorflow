@@ -50,7 +50,6 @@ class Graz_LIF(object):
     def integrating(self):
         self.has_spiked = False
         current = self.return_current()
-        self.scaled_v = (self.v - self.v_thresh) / self.v_thresh
         # z = self.H(self.scaled_v) * (1 / self.dt)
         if self.can_it_spike:
             update = (self.alpha * (self.v - self.v_rest)) + ((1 - self.alpha) * self.r_mem * current)# - (self.dt * self.v_thresh * z)
@@ -58,6 +57,7 @@ class Graz_LIF(object):
             update = self.v + (self.r_mem * current)
         update = (self.alpha * (self.v - self.v_rest)) + ((1 - self.alpha) * self.r_mem * current)# - (self.dt * self.v_thresh * z)
         self.v = update
+        self.scaled_v = (self.v - self.v_thresh) / self.v_thresh
 
     # to be perfromed once threshold crossed
     def spiked(self):
@@ -93,7 +93,7 @@ class Graz_LIF(object):
             else:
                 self.has_spiked = False
         else:
-            if self.v > self.v_thresh and self.can_it_spike:
+            if self.v > self.v_thresh and self.can_it_spike and not sigmoid:
                 self.spiked()
             elif self.t_rest > 0:
                 self.refracting()
@@ -136,75 +136,73 @@ class Network(object):
         self.did_it_spike = spike_tracking
 
 def error_and_BP_gradients(weight_matrix, return_error=False, quadratic=False):
-    for epoch in range(epochs):
+    network = Network(weight_matrix=weight_matrix, tau_refract=0)
+    number_of_neurons = len(weight_matrix)
+    spikes = [False for neuron in range(number_of_neurons)]
+    activations = [network.neuron_list[0].H(-1.0) for neuron in range(number_of_neurons)]
+    all_spikes = []
+    all_activations = []
+    # Output variables
+    I = []
+    V = []
+    scaled_V = []
+    spike_history_index = []
+    spike_history_time = []
 
-        network = Network(weight_matrix=weight_matrix, tau_refract=0)
-        number_of_neurons = len(weight_matrix)
-        spikes = [False for neuron in range(number_of_neurons)]
-        activations = [0.0 for neuron in range(number_of_neurons)]
-        all_spikes = []
-        all_activations = []
-        # Output variables
-        I = []
-        V = []
-        scaled_V = []
-        spike_history_index = []
-        spike_history_time = []
-        l_rate = min_l_rate + ((1 - (float(epoch) / float(epochs))) * (max_l_rate - min_l_rate))
+    for step in range(steps):
 
-        for step in range(steps):
+        all_spikes.append(spikes)
+        all_activations.append(activations)
 
-            all_spikes.append(spikes)
-            all_activations.append(activations)
+        t = step * dt
 
-            t = step * dt
-
-            if sigmoid:
-                network.did_it_spike = activations
-            else:
-                network.did_it_spike = spikes
-            network.step()
-
-            # Set input current in mA and save var
-            i = []
-            v = []
-            sc = []
-            spikes = []
-            activations = []
-            np.random.seed(272727)
-            for idx, neuron in enumerate(network.neuron_list):
-                if idx < number_of_neurons - 1:
-                    neuron.i_offset = 20 #* np.random.random()  # * (2.0 - (float(step)/float(steps))) / 2  # np.random.random() * 1.1#0.06
-                    neuron.v = 1.1
-                else:
-                    if optimize == 'sine':
-                        neuron.can_it_spike = False
-                i.append(neuron.i_offset)
-                v.append(neuron.v)
-                sc.append(neuron.scaled_v)
-                spikes.append(neuron.has_spiked)
-                activations.append(neuron.H(neuron.v))
-            I.append(i)
-            V.append(v)
-            scaled_V.append(sc)
-
-            for neuron in range(number_of_neurons):
-                if spikes[neuron]:
-                    spike_history_index.append(neuron)
-                    spike_history_time.append(t)
-
-        I = np.transpose(I).tolist()
-        V = np.transpose(V).tolist()
-        scaled_V = np.transpose(scaled_V).tolist()
-        all_spikes = np.transpose(all_spikes).tolist()
-        all_activations = np.transpose(all_activations).tolist()
-
-        print "epoch", epoch, "/", epochs
-
-        if return_error:
-            return hz_error(all_spikes, quadratic=quadratic)
+        if sigmoid:
+            network.did_it_spike = activations
         else:
-            return back_prop(all_spikes, scaled_V, network, all_activations)
+            network.did_it_spike = spikes
+        network.step()
+
+        # Set input current in mA and save var
+        i = []
+        v = []
+        sc = []
+        spikes = []
+        activations = []
+        np.random.seed(272727)
+        for idx, neuron in enumerate(network.neuron_list):
+            # if idx < number_of_neurons - 1:
+                # neuron.i_offset = 20 #* np.random.random()  # * (2.0 - (float(step)/float(steps))) / 2  # np.random.random() * 1.1#0.06
+                # neuron.v = 1.1
+            # else:
+            #     if optimize == 'sine':
+            #         neuron.can_it_spike = False
+            i.append(neuron.i_offset)
+            v.append(neuron.v)
+            sc.append(neuron.scaled_v)
+            spikes.append(neuron.has_spiked)
+            activations.append(neuron.H(neuron.scaled_v))
+        I.append(i)
+        V.append(v)
+        scaled_V.append(sc)
+
+        for neuron in range(number_of_neurons):
+            if spikes[neuron]:
+                spike_history_index.append(neuron)
+                spike_history_time.append(t)
+
+    I = np.transpose(I).tolist()
+    V = np.transpose(V).tolist()
+    scaled_V = np.transpose(scaled_V).tolist()
+    all_spikes = np.transpose(all_spikes).tolist()
+    all_activations = np.transpose(all_activations).tolist()
+
+    if return_error:
+        if sigmoid:
+            return hz_error(all_activations, quadratic=quadratic)
+        else:
+            return hz_error(all_spikes, quadratic=quadratic)
+    else:
+        return back_prop(all_spikes, scaled_V, network, all_activations, check=True)
 
 def hz_error(spike_history, single_error_neuron=True, quadratic=True):
     target_hz = 20
@@ -225,9 +223,9 @@ def sine_error(voltage_history, quadratic=False):
     error = 0.0
     threshold = network.v_thresh
     if quadratic:
-        error = [0.5 * (target_sine_wave[t] - ((voltage_history[number_of_neurons-1][t] + threshold) * threshold))**2 for t in range(T)]
+        error = [0.5 * (target_sine_wave[t] - ((voltage_history[number_of_neurons-1][t] * threshold) + threshold))**2 for t in range(T)]
     else:
-        error = [((voltage_history[number_of_neurons-1][t] + threshold) * threshold) - target_sine_wave[t] for t in range(T)]
+        error = [((voltage_history[number_of_neurons-1][t] * threshold) + threshold) - target_sine_wave[t] for t in range(T)]
         # error = [target_sine_wave[t] - ((voltage_history[number_of_neurons-1][t] + threshold) * threshold) for t in range(T)]
         # error = target_hz - actual_hz
     print "Error for the last iteration:", sum(error)
@@ -235,14 +233,17 @@ def sine_error(voltage_history, quadratic=False):
 
 error_tracker = []
 # error = 0.5 (y - y_target)^2
-def back_prop(spike_history, voltage_history, network, activations):
+def back_prop(spike_history, voltage_history, network, activations, check=False):
     number_of_neurons = len(spike_history)
     global error_tracker
     if optimize == 'sine':
         error = sine_error(voltage_history)
         error_tracker.append(sum([abs(error[i]) for i in range(len(error))]))
     else:
-        error = hz_error(spike_history, quadratic=False)
+        if sigmoid:
+            error = hz_error(activations, quadratic=False)
+        else:
+            error = hz_error(spike_history, quadratic=False)
         error_tracker.append(error)
     new_weight_matrix = deepcopy(network.weight_matrix)
     update_weight_matrix = np.zeros([number_of_neurons, number_of_neurons])
@@ -263,12 +264,21 @@ def back_prop(spike_history, voltage_history, network, activations):
                     p_dEdz = error * leak #* network.weight_matrix[neuron][number_of_neurons-1]
                 sum_dEdV = sum([dEdV[n][t+1] *
                                 # weight_matrix[neuron][n] *
-                                network.weight_matrix[neuron][n] *
-                                # network.weight_matrix[n][neuron] *
+                                # network.weight_matrix[neuron][n] *
+                                network.weight_matrix[n][neuron] *
                                 (1-network.neuron_list[n].alpha) *
                                 this_neuron.r_mem
                                 for n in range(number_of_neurons)])
                 dEdz[neuron][t] = p_dEdz - (dEdV[neuron][t+1] * dt * this_neuron.v_thresh) + sum_dEdV
+                # sum_dEdV = sum([(dEdV[n][t+1] *
+                #                 # weight_matrix[neuron][n] *
+                #                 # network.weight_matrix[neuron][n] *
+                #                 network.weight_matrix[n][neuron] *
+                #                 (1-network.neuron_list[n].alpha) *
+                #                 this_neuron.r_mem) -
+                #                 (dEdV[n][t + 1] * dt * this_neuron.v_thresh)
+                #                 for n in range(number_of_neurons)])
+                # dEdz[neuron][t] = p_dEdz + sum_dEdV
                 dEdV[neuron][t] = dEdz[neuron][t] * pseudo_derivative * (1/this_neuron.v_thresh) + \
                                   (dEdV[neuron][t+1] * this_neuron.alpha)
 
@@ -290,7 +300,10 @@ def back_prop(spike_history, voltage_history, network, activations):
     print "new\n", new_weight_matrix
     print "error", error_tracker[len(error_tracker)-1], "with LR", l_rate
     print error_tracker
-    return new_weight_matrix
+    if check:
+        return dEdWr
+    else:
+        return new_weight_matrix
 
 # Network
 sigmoid = True
@@ -318,18 +331,18 @@ for i in range(neurons_per_layer):
 # weight_matrix = np.transpose(weight_matrix).tolist()
 
 # Recurrent network
-number_of_neurons = 20
-weight_scale = np.sqrt(number_of_neurons)
-weight_matrix = [[np.random.randn() / weight_scale for i in range(number_of_neurons)] for j in
-                 range(number_of_neurons)]
-# weight_matrix = []
+# number_of_neurons = 20
+# weight_scale = np.sqrt(number_of_neurons)
+# weight_matrix = [[np.random.randn() / weight_scale for i in range(number_of_neurons)] for j in
+#                  range(number_of_neurons)]
+# weight_matrix = 0
 
 epochs = 100
 l_rate = 0.1
-max_l_rate = 0.00001
-min_l_rate = 0.000005
+max_l_rate = 0.0005
+min_l_rate = 0.00001
 # Duration of the simulation in ms
-T = 1000
+T = 3
 # Duration of each time step in ms
 dt = 1
 # Number of iterations = T/dt
@@ -347,14 +360,14 @@ number_of_poisson = 0 # number_of_neurons / 2
 
 if __name__ == "__main__":
 
-    if weight_matrix != []:
+    if weight_matrix.tolist() != 0:
 
         for epoch in range(epochs):
 
             network = Network(weight_matrix=weight_matrix, tau_refract=0)
             spikes = [False for neuron in range(number_of_neurons)]
             all_spikes = []
-            activations = [0.0 for neuron in range(number_of_neurons)]
+            activations = [network.neuron_list[0].H(-1.0) for neuron in range(number_of_neurons)]
             all_activations = []
             # Output variables
             I = []
@@ -390,7 +403,7 @@ if __name__ == "__main__":
                 for idx, neuron in enumerate(network.neuron_list):
                     if idx < number_of_neurons - 1:
                         if optimize == 'sine':
-                            neuron.i_offset = 2 * np.random.random() #* (2.0 - (float(step)/float(steps))) / 2  # np.random.random() * 1.1#0.06
+                            # neuron.i_offset = 2 * np.random.random() #* (2.0 - (float(step)/float(steps))) / 2  # np.random.random() * 1.1#0.06
                             if idx < number_of_poisson:
                                 neuron.poisson_rate = poisson_rate
                         else:
