@@ -208,7 +208,7 @@ def hz_error(spike_history, single_error_neuron=True, quadratic=True):
     target_hz = 20
     number_of_neurons = len(spike_history)
     if single_error_neuron:
-        actual_hz = float(sum(spike_history[number_of_neurons-1])) / (float(len(spike_history[number_of_neurons-1])) * (dt / 1000.0))
+        actual_hz = float(sum(spike_history[number_of_neurons-1])) / (float(len(spike_history[number_of_neurons-1])) * (float(dt) / 1000.0))
     else:
         actual_hz = float(sum([sum(spike_history[n]) for n in range(number_of_neurons)])) / (float(T) / 1000.0)
     if quadratic:
@@ -261,11 +261,11 @@ def back_prop(spike_history, voltage_history, network, activations, check=False)
                     p_dEdz = error[t] * leak # * network.weight_matrix[neuron][number_of_neurons-1]
                     # p_dEdz = sum(error) * leak #* network.weight_matrix[neuron][number_of_neurons-1]
                 else:
-                    p_dEdz = error * leak #* network.weight_matrix[neuron][number_of_neurons-1]
+                    p_dEdz = error #* leak #* network.weight_matrix[neuron][number_of_neurons-1]
                 sum_dEdV = sum([dEdV[n][t+1] *
                                 # weight_matrix[neuron][n] *
-                                # network.weight_matrix[neuron][n] *
-                                network.weight_matrix[n][neuron] *
+                                network.weight_matrix[neuron][n] *
+                                # network.weight_matrix[n][neuron] *
                                 (1-network.neuron_list[n].alpha) *
                                 this_neuron.r_mem
                                 for n in range(number_of_neurons)])
@@ -342,7 +342,7 @@ l_rate = 0.1
 max_l_rate = 0.0005
 min_l_rate = 0.00001
 # Duration of the simulation in ms
-T = 3
+T = 2
 # Duration of each time step in ms
 dt = 1
 # Number of iterations = T/dt
