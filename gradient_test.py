@@ -9,6 +9,7 @@ def check_gradient(f, df, x0, tries=10, deltas=(1, 1e-2, 1e-4, 1e-6)):
     g0 = df(x0)
     g0 = np.array(g0)
     g0 = g0.reshape(g0.size)
+    calc_error = []
 
     # For different variations tries if the gradient is well approximated with finite difference
     for k_dx in range(tries):
@@ -36,7 +37,7 @@ def check_gradient(f, df, x0, tries=10, deltas=(1, 1e-2, 1e-4, 1e-6)):
             df = (f1 - f0) / d
             print "f1:", f1
             print "df", df
-
+            calc_error.append(df)
             # compare the approximate change in df with actual change
             approx_err[k] = np.log10(np.abs(df_g - df) + 1e-20)
 

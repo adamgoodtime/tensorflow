@@ -50,13 +50,16 @@ class Graz_LIF(object):
     def integrating(self):
         self.has_spiked = False
         current = self.return_current()
-        # z = self.H(self.scaled_v) * (1 / self.dt)
-        if self.can_it_spike:
-            update = (self.alpha * (self.v - self.v_rest)) + ((1 - self.alpha) * self.r_mem * current)# - (self.dt * self.v_thresh * z)
+        if sigmoid:
+            self.v = current
         else:
-            update = self.v + (self.r_mem * current)
-        update = (self.alpha * (self.v - self.v_rest)) + ((1 - self.alpha) * self.r_mem * current)# - (self.dt * self.v_thresh * z)
-        self.v = update
+            # z = self.H(self.scaled_v) * (1 / self.dt)
+            if self.can_it_spike:
+                update = (self.alpha * (self.v - self.v_rest)) + ((1 - self.alpha) * self.r_mem * current)# - (self.dt * self.v_thresh * z)
+            else:
+                update = self.v + (self.r_mem * current)
+            update = (self.alpha * (self.v - self.v_rest)) + ((1 - self.alpha) * self.r_mem * current)# - (self.dt * self.v_thresh * z)
+            self.v = update
         self.scaled_v = (self.v - self.v_thresh) / self.v_thresh
 
     # to be perfromed once threshold crossed
@@ -205,10 +208,9 @@ def error_and_BP_gradients(weight_matrix, return_error=False, quadratic=False):
         return back_prop(all_spikes, scaled_V, network, all_activations, check=True)
 
 def hz_error(spike_history, single_error_neuron=True, quadratic=True):
-    target_hz = 20
     number_of_neurons = len(spike_history)
     if single_error_neuron:
-        actual_hz = float(sum(spike_history[number_of_neurons-1])) / (float(len(spike_history[number_of_neurons-1])) * (float(dt) / 1000.0))
+        actual_hz = float(sum(spike_history[number_of_neurons-1])) / (float(len(spike_history[number_of_neurons-1])) )#* (float(dt) / 1000.0))
     else:
         actual_hz = float(sum([sum(spike_history[n]) for n in range(number_of_neurons)])) / (float(T) / 1000.0)
     if quadratic:
@@ -262,6 +264,7 @@ def back_prop(spike_history, voltage_history, network, activations, check=False)
                     # p_dEdz = sum(error) * leak #* network.weight_matrix[neuron][number_of_neurons-1]
                 else:
                     p_dEdz = error #* leak #* network.weight_matrix[neuron][number_of_neurons-1]
+                    # p_dEdz = (sum(activations[number_of_neurons-1]) / (float(T) ** 2)) - (20.0 / float(T))
                 sum_dEdV = sum([dEdV[n][t+1] *
                                 # weight_matrix[neuron][n] *
                                 network.weight_matrix[neuron][n] *
@@ -331,7 +334,7 @@ for i in range(neurons_per_layer):
 # weight_matrix = np.transpose(weight_matrix).tolist()
 
 # Recurrent network
-# number_of_neurons = 20
+# number_of_neurons = 25
 # weight_scale = np.sqrt(number_of_neurons)
 # weight_matrix = [[np.random.randn() / weight_scale for i in range(number_of_neurons)] for j in
 #                  range(number_of_neurons)]
@@ -339,10 +342,10 @@ for i in range(neurons_per_layer):
 
 epochs = 100
 l_rate = 0.1
-max_l_rate = 0.0005
+max_l_rate = 0.05
 min_l_rate = 0.00001
 # Duration of the simulation in ms
-T = 2
+T = 1000
 # Duration of each time step in ms
 dt = 1
 # Number of iterations = T/dt
@@ -351,16 +354,18 @@ plot = True
 plot = not plot
 end_at_best = True
 
-optimize = 'hz'
-starting_value = 0.0
+optimize = 'sine'
+target_hz = 0.78
+starting_value = 0.25
 target_sine = lambda x: 0.25 * (np.sin(10 * x)) + starting_value
 target_sine_wave = [target_sine(t/1000.0) for t in range(T)]
 poisson_rate = 100
-number_of_poisson = 0 # number_of_neurons / 2
+number_of_poisson = number_of_neurons / 2
 
 if __name__ == "__main__":
 
     if weight_matrix.tolist() != 0:
+    # if weight_matrix != []:
 
         for epoch in range(epochs):
 
@@ -379,7 +384,7 @@ if __name__ == "__main__":
 
             np.random.seed(272727)
             for neuron in network.neuron_list:
-                neuron.v = np.random.random()
+                neuron.v = 0#np.random.random()
             neuron.v = starting_value
             for step in range(steps):
 
@@ -405,7 +410,8 @@ if __name__ == "__main__":
                         if optimize == 'sine':
                             # neuron.i_offset = 2 * np.random.random() #* (2.0 - (float(step)/float(steps))) / 2  # np.random.random() * 1.1#0.06
                             if idx < number_of_poisson:
-                                neuron.poisson_rate = poisson_rate
+                                neuron.i_offset = 2 * np.random.random() #* (2.0 - (float(step)/float(steps))) / 2  # np.random.random() * 1.1#0.06
+                                # neuron.poisson_rate = poisson_rate
                         else:
                             # neuron.i_offset = 2 * np.random.random() #* (2.0 - (float(step)/float(steps))) / 2  # np.random.random() * 1.1#0.06
                             if idx < number_of_poisson:
@@ -436,7 +442,7 @@ if __name__ == "__main__":
             all_spikes = np.transpose(all_spikes).tolist()
             all_activations = np.transpose(all_activations).tolist()
 
-            weight_matrix = back_prop(all_spikes, scaled_V, network, all_activations)
+            weight_matrix = back_prop(all_spikes, V, network, all_activations)
             print "epoch", epoch, "/", epochs
 
             # df = lambda x: gradients(all_spikes, scaled_V, network, return_error=False)
@@ -468,7 +474,7 @@ if __name__ == "__main__":
                 plt.scatter(spike_history_time, spike_history_index)
                 plt.show()
 
-            if abs(error_tracker[len(error_tracker)-1]) < 0.1 and end_at_best:
+            if abs(error_tracker[len(error_tracker)-1]) < 1e-4 and end_at_best:
                 plt.rcParams["figure.figsize"] = (12, 6)
                 # Draw the input current and the membrane potential
                 plt.figure()
@@ -493,6 +499,7 @@ if __name__ == "__main__":
                 plt.xlabel('Time (msec)')
                 plt.scatter(spike_history_time, spike_history_index)
                 plt.show()
+                back_prop(all_spikes, scaled_V, network, all_activations)
                 break
 
         print "\n", error_tracker

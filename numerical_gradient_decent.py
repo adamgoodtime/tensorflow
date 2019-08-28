@@ -29,16 +29,17 @@ class neuron(object):
         self.learning_rate = learning_rate
         self.random_feedback = random_feedback
 
-        self.activation = 0.0
+        self.internal_value = 0.0
+        self.activation = self.H(0.0)
         self.input = [0.0 for i in range(self.num_inputs)]
 
         self.old_error = 0.0
         self.new_error = 0.0
         self.dE = 0.0
         self.old_dEdw = [0.0 for i in range(self.num_inputs)]
-        self.new_dEdw = [0.0 for i in range(self.num_inputs)]
-        self.old_dE2dw2 = ['empty' for i in range(self.num_inputs)]
-        self.new_dE2dw2 = ['empty' for i in range(self.num_inputs)]
+        self.new_dEdw = [1.0 for i in range(self.num_inputs)]
+        self.old_dE2dw2 = [0.0 for i in range(self.num_inputs)]
+        self.new_dE2dw2 = [0.0 for i in range(self.num_inputs)]
 
 
     # activation function
@@ -55,30 +56,38 @@ class neuron(object):
             # print "H dev - og:", np.exp(-x) / ((1 + np.exp(-x))**2), "gb:", value / (1 - value)
             return value * (1 - value)
         else:
-            return 1 / (1 + np.exp(-x))
+            if x > 700:
+                return 1
+            elif x < -700:
+                return 0
+            else:
+                return 1 / (1 + np.exp(-x))
 
     def step(self):
-        self.activation += self.integrate_inputs()
+        self.internal_value = self.integrate_inputs()
+        self.activation = self.H(self.internal_value)
 
     def integrate_inputs(self):
         inputs = [self.weights[i] * self.input[i] for i in range(len(self.weights))]
         return sum(inputs)
 
-    def perturb_weight(self):
+    def perturb_weight(self, scale):
         for i in range(self.num_inputs):
             if self.weights[i] != 0:
                 self.old_weights[i] = self.weights[i]
-                self.weights[i] = np.random.randn() / weight_scale
+                self.weights[i] = np.random.randn() / scale
 
     def update_gradients(self, error):
         self.old_error = self.new_error
         self.new_error = error * self.random_feedback
         self.dE = self.new_error - self.old_error
         for synapse in range(self.num_inputs):
-            if self.weights[synapse] != 0:
+            if self.weights[synapse] != 0 and np.random.random() < prob_change:
                 self.update_synapse(synapse)
+        # self.perturb_weight(self.dE)
 
     def update_synapse(self, synapse):
+        epsilon = 0
         dw = self.weights[synapse] - self.old_weights[synapse]
         self.old_dEdw[synapse] = self.new_dEdw[synapse]
         if dw == 0:
@@ -87,32 +96,51 @@ class neuron(object):
         else:
             self.new_dEdw[synapse] = (self.gradient_decay * self.old_dEdw[synapse]) + (self.dE / dw)
         self.old_weights[synapse] = self.weights[synapse]
-        # add a learning rate or deminish amount added
-        self.weights[synapse] -= self.new_error / self.new_dEdw[synapse] * self.learning_rate
-        if self.old_weights[synapse] == self.weights[synapse]:
-            # print "",#heeeeellll no"
-            a = None
         # find someway to use the second derivative to moderate learning rate
-        if self.new_dE2dw2[synapse] == 'empty':
-            self.new_dE2dw2[synapse] = 0.0
+        if self.new_dE2dw2[synapse] == 0.0:
+            self.new_dE2dw2[synapse] = 1.0
         else:
             self.old_dE2dw2[synapse] = self.new_dE2dw2[synapse]
             gradient_change = self.new_dEdw[synapse] - self.old_dEdw[synapse]
-            self.new_dE2dw2[synapse] = (self.gradient2_decay * self.old_dE2dw2[synapse]) + gradient_change
+            # self.new_dE2dw2[synapse] = (self.gradient2_decay * self.old_dE2dw2[synapse]) + gradient_change
+            self.new_dE2dw2[synapse] = gradient_change
             # self.new_dEdw[synapse] = (self.gradient2_decay * self.old_dE2dw2[synapse]) + gradient_change
 
+        # add a learning rate or deminish amount added
+        weight_update = (self.new_error / (self.new_dEdw[synapse] + epsilon)) #* self.learning_rate
+        weight_update = (self.H(weight_update) - 0.5) * self.learning_rate
+        # weight_update = (-self.new_dEdw[synapse]) * self.learning_rate
+        if abs(weight_update) > 1000:
+            a = None
+        # weight_update = ((1 * np.sign(self.new_error)) / self.new_dEdw[synapse]) * self.learning_rate #* self.new_dE2dw2[synapse]
+        # weight_update = (np.random.randn() * self.new_dEdw[synapse]) * self.learning_rate #* self.new_dE2dw2[synapse]
+        # print "dw:{:8}\toldg:{:8}\tnewg:{:8}\told2:{:8}\tnew2:{:8}".format(round(weight_update, 2), round(self.old_dEdw[synapse], 2), round(self.new_dEdw[synapse], 2), round(self.old_dE2dw2[synapse], 2), self.new_dE2dw2[synapse])
+        self.weights[synapse] -= weight_update
+        # self.weights[synapse] = min(max(self.weights[synapse], min_weight), max_weight)
+        # if self.weights[synapse] == max_weight or self.weights[synapse] == min_weight:
+        #     self.learning_rate *= -1
+        # else:
+        #     self.learning_rate = abs(self.learning_rate)
+        if self.old_weights[synapse] == self.weights[synapse]:
+            # print "",#heeeeellll no"
+            a = None
 def hz_error(activations, target_value):
-    return ((sum(activations) / steps) - target_value)
+    # return ((sum(activations) / steps) - target_value)
+    return ((sum(activations)) - target_value)
 
-def sine_error(activations, rate, scale, starting_value=0):
-    target_sine = lambda x: scale * (np.sin(rate * x)) + starting_value
-    target_sine_wave = [target_sine(t / 1000.0) for t in range(steps)]
-    errors = [(activations[i] - target_sine_wave[i])**2 for i in range(steps)]
-    total_error = sum(errors) / steps
+def sine_error(activations, instant=True, current_step=0):
+    if instant:
+        error = activations - target_sine_wave[current_step]
+        return error
+    else:
+        errors = [(activations[i] - target_sine_wave[i])**2 for i in range(steps)]
+        sign = np.sign(sum([(activations[i] - target_sine_wave[i]) for i in range(steps)]))
+        total_error = sum(errors) / steps
+        total_error *= sign
     return total_error
 
-neurons_per_layer = 21
-hidden_layers = 4
+neurons_per_layer = 3
+hidden_layers = 2
 input_neurons = 1
 output_neurons = 1
 weight_scale = np.sqrt(neurons_per_layer)
@@ -134,24 +162,29 @@ for i in range(neurons_per_layer):
 # weight_matrix = np.transpose(weight_matrix).tolist()
 
 # Recurrent network
-number_of_neurons = 25
+number_of_neurons = 5
 weight_scale = np.sqrt(number_of_neurons)
 weight_matrix = [[np.random.randn() / weight_scale for i in range(number_of_neurons)] for j in
                  range(number_of_neurons)]
 
-epochs = 1000
-steps = 100
+epochs = 500
+steps = 1000
 target_value = 100
-sine_rate = 60
+sine_rate = 6
 sine_scale = 0.25
-learn = 'hz'
-learning_rate = 0.9
-gamma = 0.001
+learn = 'sine'
+target_sine = lambda x: sine_scale * (np.sin(sine_rate * x)) + 0.5
+target_sine_wave = [target_sine(t / 1000.0) for t in range(steps)]
+learning_rate = 1.0
+gamma = 0.9
+prob_change = 1
+min_weight = -4.0
+max_weight = 4.0
 error_over_time = []
 
 neuron_list = []
 for i in range(number_of_neurons):
-    random_feedback = 1 #+ (np.random.randn() * 0.1)
+    random_feedback = 1#abs(np.random.randn() * 1)
     neuron_list.append(neuron(0, np.take(weight_matrix, i, axis=1), gamma, 0.999, learning_rate, random_feedback))
     # neuron_list.append(neuron(0, weight_matrix[i], 0.9, 0.999, 0.1, 1))
 
@@ -168,19 +201,21 @@ for epoch in range(epochs):
         for i in range(number_of_neurons):
             neuron_list[i].input = activations
             neuron_list[i].step()
+        instant_error = sine_error(neuron_list[i].activation)
+        for i in range(number_of_neurons):
+            if step == 0:
+                neuron_list[i].new_error = instant_error
+                neuron_list[i].perturb_weight(weight_scale)
+            else:
+                neuron_list[i].learning_rate = learning_rate * (1 - (float(epoch) / float(epochs)))
+                neuron_list[i].update_gradients(instant_error)
         error.append(neuron_list[number_of_neurons-1].activation)
     if learn == 'hz':
         error_over_time.append(hz_error(error, target_value))
     else:
-        error_over_time.append(sine_error(error, sine_rate, sine_scale))
-    print error_over_time[epoch]
-    if abs(error_over_time[epoch]) < 0.01:
+        error_over_time.append(sine_error(error, instant=False))
+    print "\n", error_over_time[epoch], "\n"
+    if abs(error_over_time[epoch]) < 0.001:
         break
-    for i in range(number_of_neurons):
-        if epoch == 0:
-            neuron_list[i].new_error = error_over_time[epoch]
-            neuron_list[i].perturb_weight()
-        else:
-            neuron_list[i].update_gradients(error_over_time[epoch])
 
 print "done"
