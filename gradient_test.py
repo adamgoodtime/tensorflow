@@ -1,5 +1,6 @@
 import numpy as np
 from graz_non_tensor import *
+from graz_sigmoid import *
 
 # target hz - z * pseudo_Dev * pre_synap spike + c + (1 - alpha)
 
@@ -35,6 +36,7 @@ def check_gradient(f, df, x0, tries=10, deltas=(1, 1e-2, 1e-4, 1e-6)):
             f1 = f(x0 + d * dx)
             # approximate the change in value between the 2 points
             df = (f1 - f0) / d
+            print "f0:", f0
             print "f1:", f1
             print "df", df
             calc_error.append(df)
@@ -71,6 +73,8 @@ if __name__ == "__main__":
     # df = lambda x: f(x) * (1 - f(x))
     # f = lambda x: np.sum(1 / (1 + np.exp(-x)))
     # df = lambda x: np.exp(-x) / ((1 + np.exp(-x))**2)
-    f = lambda x: error_and_BP_gradients(x.reshape((int(np.sqrt(len(x))), int(np.sqrt(len(x))))), return_error=True, quadratic=True)
-    df = lambda x: error_and_BP_gradients(x.reshape((int(np.sqrt(len(x))), int(np.sqrt(len(x))))), return_error=False)
+    f = lambda x: bp_and_error(x.reshape((int(np.sqrt(len(x))), int(np.sqrt(len(x))))), error_return=True)
+    df = lambda x: bp_and_error(x.reshape((int(np.sqrt(len(x))), int(np.sqrt(len(x))))), error_return=False)
+    # f = lambda x: error_and_BP_gradients(x.reshape((int(np.sqrt(len(x))), int(np.sqrt(len(x))))), return_error=True, quadratic=True)
+    # df = lambda x: error_and_BP_gradients(x.reshape((int(np.sqrt(len(x))), int(np.sqrt(len(x))))), return_error=False)
     check_gradient(f, df, w0)
