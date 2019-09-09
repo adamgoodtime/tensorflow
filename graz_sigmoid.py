@@ -35,7 +35,7 @@ class sigmoid_neuron(object):
         if dev:
             # x *= 3
             # return np.exp(-x) / ((1 + np.exp(-x)) ** 2)
-            value = self.H(x, dev=False, sigmoid=True)
+            value = self.H(x, dev=False, sigmoid=sigmoid)
             # print "H dev - og:", np.exp(-x) / ((1 + np.exp(-x))**2), "gb:", value / (1 - value)
             return value * (1 - value)
         else:
@@ -65,7 +65,7 @@ class sigmoid_neuron(object):
         delta_w = [0.0 for i in range(self.num_inputs)]
         for i in range(self.num_inputs):
             if self.forward_weights[i]:
-                delta_w[i] += l_rate * activations[i] * self.error
+                delta_w[i] += l_rate * activations[i] * self.error#* self.forward_weights[i] #self.error
         return delta_w
 
 class Network(object):
@@ -108,14 +108,14 @@ class Network(object):
         self.internal_values = internal_values
 
     def backward_step(self, internal_values, activations, error):
-        errors = []
+        errors = [0.0 for i in range(number_of_neurons)]
         for idx, neuron in reversed(list(enumerate(self.neuron_list))):
             if idx >= number_of_neurons - output_neurons:
                 neuron.error = error * neuron.H(internal_values[idx], dev=True) # * o_m-1
             else:
                 neuron.backward_errors = self.errors
                 neuron.backward_step(activations[idx])
-            errors.append(neuron.error)
+            errors[idx] = neuron.error
         self.errors = errors
 
     def weight_update(self, internal_values, activations, error):
@@ -189,6 +189,7 @@ def bp_and_error(weight_matrix, error_return=False):
     # weight_update = [0,-0.5,0,0]
     # weight_update = np.array(weight_update)
     weight_update /= steps
+    # weight_update *= -2
     return -weight_update
     # weight_matrix = (np.array(weight_matrix) - weight_update).tolist()
 
@@ -242,14 +243,14 @@ l_rate = 1
 max_l_rate = 0.05
 min_l_rate = 0.00001
 # Duration of the simulation in ms
-T = 3
+T = 5
 # Duration of each time step in ms
 dt = 1
 # Number of iterations = T/dt
 steps = int(T / dt)
 
 learn = 'hz'
-target_hz = 1.25#0.78
+target_hz = 0.68
 sine_rate = 100
 sine_scale = 0.25
 total = False

@@ -66,7 +66,10 @@ if __name__ == "__main__":
     mean = 0
     w0 = np.random.randn(4) + mean
     I = np.array([[0, 1], [0, 0]])
-    I = np.array([0, 0.5, 0, 0])
+    I = np.array([0, 0.25, 0, 0])
+    I = np.array([0, 0.25, 0,
+                  0, 0, 0.5,
+                  0, 0, 0])
     w0 = I
     # f = lambda w: 0.5 * np.sum(w ** 2)
     # df = lambda w: w
