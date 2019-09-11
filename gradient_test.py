@@ -32,7 +32,7 @@ def check_gradient(f, df, x0, tries=10, deltas=(1, 1e-2, 1e-4, 1e-6)):
             print "d * dx:", d * dx
             print "all:", x0 + d * dx
             print "df_0:", df_0
-            print "diff_0", np.inner(dx - x0, g0)
+            print "diff_0", np.inner(x0 - (dx * d), g0)
             f1 = f(x0 + d * dx)
             # approximate the change in value between the 2 points
             df = (f1 - f0) / d
@@ -46,7 +46,6 @@ def check_gradient(f, df, x0, tries=10, deltas=(1, 1e-2, 1e-4, 1e-6)):
         # if difference is small enough give all clear
         if (np.diff(approx_err) < -1).all() or (approx_err <= -20).all():
             print('Gradient security check OK: the gradient df is well approximated by finite difference.')
-
         else:
             raise ValueError(
                 '''GRADIENT SECURITY CHECK ERROR:
@@ -69,6 +68,9 @@ if __name__ == "__main__":
     I = np.array([0, 0.25, 0, 0])
     I = np.array([0, 0.25, 0,
                   0, 0, 0.5,
+                  0, 0, 0])
+    I = np.array([0, 0, 0.3,
+                  0, 0, 0.25,
                   0, 0, 0])
     w0 = I
     # f = lambda w: 0.5 * np.sum(w ** 2)

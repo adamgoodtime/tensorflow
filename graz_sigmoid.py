@@ -54,18 +54,19 @@ class sigmoid_neuron(object):
         inputs = [self.forward_weights[i] * self.input[i] for i in range(len(self.forward_weights))]
         return sum(inputs)
 
-    def backward_step(self, activation):
-        self.error = self.integrate_errors(activation)
+    def backward_step(self, internal_value):
+        self.error = self.integrate_errors(internal_value)
 
-    def integrate_errors(self, activation):
-        outputs = [self.backward_weights[i] * self.backward_errors[i] * self.H(activation, dev=True) for i in range(len(self.backward_weights))]
+    def integrate_errors(self, internal_value):
+        # outputs = [self.backward_weights[i] * self.backward_errors[i] * (activation*(1-activation)) for i in range(len(self.backward_weights))]
+        outputs = [self.backward_weights[i] * self.backward_errors[i] * self.H(internal_value, dev=True) for i in range(len(self.backward_weights))]
         return sum(outputs)
 
     def delta_w(self, activations):
         delta_w = [0.0 for i in range(self.num_inputs)]
         for i in range(self.num_inputs):
             if self.forward_weights[i]:
-                delta_w[i] += l_rate * activations[i] * self.error#* self.forward_weights[i] #self.error
+                delta_w[i] += l_rate * self.error * activations[i] #* self.forward_weights[i] #self.error
         return delta_w
 
 class Network(object):
@@ -114,7 +115,8 @@ class Network(object):
                 neuron.error = error * neuron.H(internal_values[idx], dev=True) # * o_m-1
             else:
                 neuron.backward_errors = self.errors
-                neuron.backward_step(activations[idx])
+                # neuron.backward_step(activations[idx])
+                neuron.backward_step(internal_values[idx])
             errors[idx] = neuron.error
         self.errors = errors
 
@@ -142,7 +144,8 @@ def hz_error(activations, dev=False):
     if dev:
         return (sum(activations) / steps) - target_hz
     else:
-        return activations[-1] - target_hz
+        # return activations[-1] - target_hz
+        return [activations[i] - target_hz for i in range(len(activations))]
         return sum([activations[i] - target_hz for i in range(len(activations))]) / steps
         return 0.5 * (((sum(activations) / steps) - target_hz)**2)
 
@@ -173,7 +176,7 @@ def bp_and_error(weight_matrix, error_return=False):
             all_errors.append(error)
             print error
     if error_return:
-        return error
+        return sum(error)
     weight_update = np.zeros([number_of_neurons, number_of_neurons])
     # if learn == 'sine' and not total:
     #     network.backward_step(all_internal_values[-1], all_activations[-1], error[-1])
@@ -183,13 +186,15 @@ def bp_and_error(weight_matrix, error_return=False):
         if learn == 'sine' and not total:
             new_weight_update = np.array(network.weight_update(all_internal_values[step], all_activations[step], error[step])).transpose()
         else:
-            new_weight_update = np.array(network.weight_update(all_internal_values[step], all_activations[step], error)).transpose()
+            new_weight_update = np.array(network.weight_update(all_internal_values[step], all_activations[step], error[step])).transpose()
+            # new_weight_update = np.array(network.weight_update(all_internal_values[step], all_activations[step], error)).transpose()
         weight_update += new_weight_update
         print "weight update:", new_weight_update
     # weight_update = [0,-0.5,0,0]
     # weight_update = np.array(weight_update)
-    weight_update /= steps
+    # weight_update /= steps
     # weight_update *= -2
+    print "total update:", weight_update
     return -weight_update
     # weight_matrix = (np.array(weight_matrix) - weight_update).tolist()
 
