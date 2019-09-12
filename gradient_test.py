@@ -1,6 +1,7 @@
 import numpy as np
 from graz_non_tensor import *
 from graz_sigmoid import *
+from trask_rnn_BPTT import *
 
 # target hz - z * pseudo_Dev * pre_synap spike + c + (1 - alpha)
 
@@ -28,17 +29,18 @@ def check_gradient(f, df, x0, tries=10, deltas=(1, 1e-2, 1e-4, 1e-6)):
         # loop through the different deltas
         for k, d in enumerate(deltas):
             # calculate the value at the next point
-            print "\nx0:", x0
-            print "d * dx:", d * dx
-            print "all:", x0 + d * dx
+            # print "\nx0:", x0
+            # print "d * dx:", d * dx
+            # print "all:", x0 + d * dx
             print "df_0:", df_0
-            print "diff_0", np.inner(x0 - (dx * d), g0)
+            print "diff_0", np.inner(x0 + (dx * d), g0)
             f1 = f(x0 + d * dx)
             # approximate the change in value between the 2 points
             df = (f1 - f0) / d
             print "f0:", f0
             print "f1:", f1
             print "df", df
+            print "\n"
             calc_error.append(df)
             # compare the approximate change in df with actual change
             approx_err[k] = np.log10(np.abs(df_g - df) + 1e-20)
@@ -61,7 +63,7 @@ def check_gradient(f, df, x0, tries=10, deltas=(1, 1e-2, 1e-4, 1e-6)):
 
 
 if __name__ == "__main__":
-    # np.random.seed(272727)
+    np.random.seed(272727)
     mean = 0
     w0 = np.random.randn(4) + mean
     I = np.array([[0, 1], [0, 0]])
@@ -72,14 +74,23 @@ if __name__ == "__main__":
     I = np.array([0, 0, 0.3,
                   0, 0, 0.25,
                   0, 0, 0])
+
+    input_dim = 2
+    hidden_dim = 16
+    output_dim = 1
+    I = np.random.randn((input_dim + hidden_dim + output_dim) * (input_dim + hidden_dim + output_dim))
+    I = np.random.randn((input_dim * hidden_dim) + (hidden_dim * hidden_dim) + (hidden_dim * output_dim))
+
     w0 = I
     # f = lambda w: 0.5 * np.sum(w ** 2)
     # df = lambda w: w
     # df = lambda x: f(x) * (1 - f(x))
     # f = lambda x: np.sum(1 / (1 + np.exp(-x)))
     # df = lambda x: np.exp(-x) / ((1 + np.exp(-x))**2)
-    f = lambda x: bp_and_error(x.reshape((int(np.sqrt(len(x))), int(np.sqrt(len(x))))), error_return=True)
-    df = lambda x: bp_and_error(x.reshape((int(np.sqrt(len(x))), int(np.sqrt(len(x))))), error_return=False)
     # f = lambda x: error_and_BP_gradients(x.reshape((int(np.sqrt(len(x))), int(np.sqrt(len(x))))), return_error=True, quadratic=True)
     # df = lambda x: error_and_BP_gradients(x.reshape((int(np.sqrt(len(x))), int(np.sqrt(len(x))))), return_error=False)
+    # f = lambda x: bp_and_error(x.reshape((int(np.sqrt(len(x))), int(np.sqrt(len(x))))), error_return=True)
+    # df = lambda x: bp_and_error(x.reshape((int(np.sqrt(len(x))), int(np.sqrt(len(x))))), error_return=False)
+    f = lambda x: trask_BPTT(x, input_dim, hidden_dim, output_dim, error_return=True)
+    df = lambda x: trask_BPTT(x, input_dim, hidden_dim, output_dim, error_return=False)
     check_gradient(f, df, w0)
