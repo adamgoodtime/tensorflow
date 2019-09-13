@@ -16,8 +16,8 @@ def check_gradient(f, df, x0, tries=10, deltas=(1, 1e-2, 1e-4, 1e-6)):
     # For different variations tries if the gradient is well approximated with finite difference
     for k_dx in range(tries):
         # random steps
-        dx = np.random.randn(x0.size) + mean
-        dx = I
+        # dx = np.random.randn(x0.size) + mean
+        dx = I / 2
         # dx = np.random.randn(len(x0), len(x0[0]))
 
         # initialise error
@@ -33,6 +33,7 @@ def check_gradient(f, df, x0, tries=10, deltas=(1, 1e-2, 1e-4, 1e-6)):
             # print "d * dx:", d * dx
             # print "all:", x0 + d * dx
             print "df_0:", df_0
+            print "df_g:", df_g
             print "diff_0", np.inner(x0 + (dx * d), g0)
             f1 = f(x0 + d * dx)
             # approximate the change in value between the 2 points
@@ -40,6 +41,12 @@ def check_gradient(f, df, x0, tries=10, deltas=(1, 1e-2, 1e-4, 1e-6)):
             print "f0:", f0
             print "f1:", f1
             print "df", df
+            new_g0 = np.inner(x0 + (dx * d), g0)
+            moved_by = np.inner((dx * d), g0)
+            print "new g0", new_g0
+            print "moved by", moved_by
+            print "scaled move", moved_by / d
+            print "ratio incorrect", df / (moved_by / d)
             print "\n"
             calc_error.append(df)
             # compare the approximate change in df with actual change
@@ -65,23 +72,18 @@ def check_gradient(f, df, x0, tries=10, deltas=(1, 1e-2, 1e-4, 1e-6)):
 if __name__ == "__main__":
     np.random.seed(272727)
     mean = 0
-    w0 = np.random.randn(4) + mean
-    I = np.array([[0, 1], [0, 0]])
-    I = np.array([0, 0.25, 0, 0])
+    I = np.random.randn(4) + mean
+    # I = np.array([[0, 1], [0, 0]])
+    # I = np.array([0, 0.25, 0, 0])
     I = np.array([0, 0.25, 0,
                   0, 0, 0.5,
                   0, 0, 0])
-    I = np.array([0, 0, 0.3,
-                  0, 0, 0.25,
-                  0, 0, 0])
+    # I = np.arange(1, 10, 1)
+    # I = np.array([0, 0, 0.3,
+    #               0, 0, 0.25,
+    #               0, 0, 0])
 
-    input_dim = 2
-    hidden_dim = 16
-    output_dim = 1
-    I = np.random.randn((input_dim + hidden_dim + output_dim) * (input_dim + hidden_dim + output_dim))
-    I = np.random.randn((input_dim * hidden_dim) + (hidden_dim * hidden_dim) + (hidden_dim * output_dim))
 
-    w0 = I
     # f = lambda w: 0.5 * np.sum(w ** 2)
     # df = lambda w: w
     # df = lambda x: f(x) * (1 - f(x))
@@ -89,8 +91,15 @@ if __name__ == "__main__":
     # df = lambda x: np.exp(-x) / ((1 + np.exp(-x))**2)
     # f = lambda x: error_and_BP_gradients(x.reshape((int(np.sqrt(len(x))), int(np.sqrt(len(x))))), return_error=True, quadratic=True)
     # df = lambda x: error_and_BP_gradients(x.reshape((int(np.sqrt(len(x))), int(np.sqrt(len(x))))), return_error=False)
-    # f = lambda x: bp_and_error(x.reshape((int(np.sqrt(len(x))), int(np.sqrt(len(x))))), error_return=True)
-    # df = lambda x: bp_and_error(x.reshape((int(np.sqrt(len(x))), int(np.sqrt(len(x))))), error_return=False)
-    f = lambda x: trask_BPTT(x, input_dim, hidden_dim, output_dim, error_return=True)
-    df = lambda x: trask_BPTT(x, input_dim, hidden_dim, output_dim, error_return=False)
+    f = lambda x: bp_and_error(x.reshape((int(np.sqrt(len(x))), int(np.sqrt(len(x))))), error_return=True)
+    df = lambda x: bp_and_error(x.reshape((int(np.sqrt(len(x))), int(np.sqrt(len(x))))), error_return=False)
+    # input_dim = 2
+    # hidden_dim = 16
+    # output_dim = 1
+    # I = np.random.randn((input_dim + hidden_dim + output_dim) * (input_dim + hidden_dim + output_dim))
+    # I = np.random.randn((input_dim * hidden_dim) + (hidden_dim * hidden_dim) + (hidden_dim * output_dim))
+    # f = lambda x: trask_BPTT(x, input_dim, hidden_dim, output_dim, error_return=True)
+    # df = lambda x: trask_BPTT(x, input_dim, hidden_dim, output_dim, error_return=False)
+
+    w0 = I
     check_gradient(f, df, w0)
