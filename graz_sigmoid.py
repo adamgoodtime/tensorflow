@@ -132,7 +132,7 @@ class Network(object):
             update_weight_matrix.append(neuron.delta_w(activations))
         return update_weight_matrix
 
-def bp_and_error(weight_matrix, error_return=False, print_update=True):
+def bp_and_error(weight_matrix, error_return=False, print_update=False):
     global number_of_neurons, epoch_errors, neuron_output
     number_of_neurons = len(weight_matrix)
     # weight_matrix.tolist()
@@ -243,10 +243,10 @@ total = False
 target_sine = lambda x: sine_scale * (np.sin(sine_rate * x)) + 0.5
 target_sine_wave = [target_sine(t / 1000.0) for t in range(steps)]
 
+epoch_errors = []
+neuron_output = []
 
 if __name__ == "__main__":
-    epoch_errors = []
-    neuron_output = []
     for epoch in range(epochs):
         weight_update = bp_and_error(weight_matrix, error_return=False, print_update=False)
         weight_matrix = (np.array(weight_matrix) - weight_update).tolist()

@@ -2,6 +2,7 @@ import numpy as np
 from graz_non_tensor import *
 from graz_sigmoid import *
 from trask_rnn_BPTT import *
+from brilliant_BP_formulas import *
 
 # target hz - z * pseudo_Dev * pre_synap spike + c + (1 - alpha)
 

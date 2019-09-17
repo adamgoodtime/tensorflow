@@ -36,36 +36,66 @@ y = np.array([[0, 1, 0, 1, 1, 0]]).T
 hidden_weights = 2*np.random.random((X.shape[1] + 1, num_hidden)) - 1
 output_weights = 2*np.random.random((num_hidden + 1, y.shape[1])) - 1
 
-# number of iterations of gradient descent
-num_iterations = 10000
+def brilliant_BP(weights, return_error=True):
+    global hidden_weights, output_weights
+    hidden_weights = weights[0]
+    output_weights = weights[1]
 
-# for each iteration of gradient descent
-for i in range(num_iterations):
-
-    # forward phase
-    # np.hstack((np.ones(...), X) adds a fixed input of 1 for the bias weight
     input_layer_outputs = np.hstack((np.ones((X.shape[0], 1)), X))
     hidden_layer_outputs = np.hstack((np.ones((X.shape[0], 1)), sigmoid(np.dot(input_layer_outputs, hidden_weights))))
     output_layer_outputs = np.dot(hidden_layer_outputs, output_weights)
 
-    # backward phase
     # output layer error term
     output_error = output_layer_outputs - y
-    # hidden layer error term
-    # [:, 1:] removes the bias term from the backpropagation
-    hidden_error = hidden_layer_outputs[:, 1:] * (1 - hidden_layer_outputs[:, 1:]) * np.dot(output_error, output_weights.T[:, 1:])
+    if return_error:
+        return sum(output_error)
+
+    # backward phase
+    hidden_error = hidden_layer_outputs[:, 1:] * (1 - hidden_layer_outputs[:, 1:]) * np.dot(output_error,
+                                                                                            output_weights.T[:, 1:])
 
     # partial derivatives
-    hidden_pd = input_layer_outputs[:, :, np.newaxis] * hidden_error[: , np.newaxis, :]
+    hidden_pd = input_layer_outputs[:, :, np.newaxis] * hidden_error[:, np.newaxis, :]
     output_pd = hidden_layer_outputs[:, :, np.newaxis] * output_error[:, np.newaxis, :]
 
     # average for total gradients
     total_hidden_gradient = np.average(hidden_pd, axis=0)
     total_output_gradient = np.average(output_pd, axis=0)
 
-    # update weights
-    hidden_weights += - alpha * total_hidden_gradient
-    output_weights += - alpha * total_output_gradient
+    return [total_hidden_gradient, total_output_gradient]
 
-# print the final outputs of the neural network on the inputs X
-print("Output After Training: \n{}".format(output_layer_outputs))
+if __name__ == "__main__":
+
+    # number of iterations of gradient descent
+    num_iterations = 10000
+
+    # for each iteration of gradient descent
+    for i in range(num_iterations):
+
+        # forward phase
+        # np.hstack((np.ones(...), X) adds a fixed input of 1 for the bias weight
+        input_layer_outputs = np.hstack((np.ones((X.shape[0], 1)), X))
+        hidden_layer_outputs = np.hstack((np.ones((X.shape[0], 1)), sigmoid(np.dot(input_layer_outputs, hidden_weights))))
+        output_layer_outputs = np.dot(hidden_layer_outputs, output_weights)
+
+        # backward phase
+        # output layer error term
+        output_error = output_layer_outputs - y
+        # hidden layer error term
+        # [:, 1:] removes the bias term from the backpropagation
+        hidden_error = hidden_layer_outputs[:, 1:] * (1 - hidden_layer_outputs[:, 1:]) * np.dot(output_error, output_weights.T[:, 1:])
+
+        # partial derivatives
+        hidden_pd = input_layer_outputs[:, :, np.newaxis] * hidden_error[: , np.newaxis, :]
+        output_pd = hidden_layer_outputs[:, :, np.newaxis] * output_error[:, np.newaxis, :]
+
+        # average for total gradients
+        total_hidden_gradient = np.average(hidden_pd, axis=0)
+        total_output_gradient = np.average(output_pd, axis=0)
+
+        # update weights
+        hidden_weights += - alpha * total_hidden_gradient
+        output_weights += - alpha * total_output_gradient
+
+    # print the final outputs of the neural network on the inputs X
+    print "Output After Training: \n{}".format(output_layer_outputs)
