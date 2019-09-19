@@ -28,15 +28,18 @@ def backward_step(weight_matrix):
     dodw = hidden_value * drv_sig(weight_matrix[-2][-1] * hidden_value)
     print "gradient:\t", dodw
     input_value = activation_values[-2][-3]
+    forward_weight = weight_matrix[-2][-1]
+    backward_weight = weight_matrix[-3][-2]
     dodw2 = input_value * \
-            weight_matrix[-2][-1] * drv_sig(weight_matrix[-3][-2] * input_value) * \
-            drv_sig(weight_matrix[-2][-1] * sig(input_value * weight_matrix[-3][-2]))
+            forward_weight * drv_sig(backward_weight * input_value) * \
+            drv_sig(forward_weight * sig(input_value * backward_weight))
     print "gradient2:\t", dodw2
+    print "total gradient:", dodw + dodw2
     return dodw + dodw2
 
 
-weight_matrix = [[0, 1, 0],
-                 [0, 0, 1],
+weight_matrix = [[0, 0.5, 0],
+                 [0, 0, 0.5],
                  [0, 0, 0]]
 
 target_output = 0.78
