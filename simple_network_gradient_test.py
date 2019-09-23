@@ -38,7 +38,7 @@ def backward_step(weight_matrix):
     return dodw + dodw2
 
 
-weight_matrix = [[0, 0.5, 0],
+weight_matrix = [[0, 0.25, 0],
                  [0, 0, 0.5],
                  [0, 0, 0]]
 

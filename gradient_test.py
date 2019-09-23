@@ -7,7 +7,7 @@ from true_gradients import *
 
 # target hz - z * pseudo_Dev * pre_synap spike + c + (1 - alpha)
 
-def check_gradient(f, df, x0, tries=10, deltas=(1, 1e-2, 1e-4, 1e-6)):
+def check_gradient(f, df, x0, tries=10, deltas=(1, 1e-3, 1e-6)):
     # Init around the point x0
     f0 = f(x0)
     g0 = df(x0)
@@ -18,8 +18,10 @@ def check_gradient(f, df, x0, tries=10, deltas=(1, 1e-2, 1e-4, 1e-6)):
     # For different variations tries if the gradient is well approximated with finite difference
     for k_dx in range(tries):
         # random steps
-        # dx = np.random.randn(x0.size) + mean
-        dx = I / 2
+        dx = np.random.randn(x0.size) + mean
+        # dx = np.array([0, 1, 0,
+        #                0, 0, 1,
+        #                0, 0, 0])
         # dx = np.random.randn(len(x0), len(x0[0]))
 
         # initialise error
@@ -74,14 +76,19 @@ def check_gradient(f, df, x0, tries=10, deltas=(1, 1e-2, 1e-4, 1e-6)):
 
 
 if __name__ == "__main__":
-    np.random.seed(2734)
+    np.random.seed(27)
     mean = 0
     I = np.random.randn(9) + mean
     # I = np.array([[0, 1], [0, 0]])
     # I = np.array([0, np.random.randn(1).tolist()[0], 0, 0])
-    I = np.array([0, 0.25, 0,
-                  0, 0, 0.5,
-                  0, 0, 0])
+    # I = np.array([0, 0.25, 0,
+    #               0, 0, 0.5,
+    #               0, 0, 0])
+    # I = np.array([0, 0.5,
+    #               0, 0])
+    # I = np.array([0, 0, 0,
+    #               0, 0, 0.5,
+    #               0, 0, 0])
     # I = np.arange(1, 10, 1)
     # I = np.array([0, 0, 0.3,
     #               0, 0, 0.25,

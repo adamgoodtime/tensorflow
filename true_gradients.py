@@ -15,7 +15,8 @@ class sigmoid_neuron(object):
         self.backward_errors = [0.0 for i in range(self.num_inputs)]
         self.backward_weights = backward_weights
         self.error = 0.0
-        self.gradients = [0.0 for i in range(self.num_inputs)]
+        self.neuron_gradient = 0.0
+        self.weight_gradients = [0.0 for i in range(self.num_inputs)]
 
         self.output = output
 
@@ -56,35 +57,9 @@ class sigmoid_neuron(object):
         self.internal_value = self.integrate_inputs()
         self.activation = self.H(self.internal_value)
 
-    def calculate_gradients(self, neuron_id, activations, internal_values):
-        weight_gradients = []
-        for idx, weight in enumerate(self.forward_weights):
-            if self.forward_weights[idx]:
-                weight_gradients.append(activations[idx] * self.H(internal_values[neuron_id], dev=True))
-            else:
-                weight_gradients.append(0.0)
-        self.gradients = weight_gradients
-        return weight_gradients
-
     def integrate_inputs(self):
         inputs = [self.forward_weights[i] * self.input[i] for i in range(len(self.forward_weights))]
         return sum(inputs)
-
-    def backward_step(self, backward_gradients):
-        self.error = sum([backward_gradients[i] * self.backward_errors[i]for i in range(len(self.backward_weights))])
-
-    # def integrate_errors(self, internal_value):
-    #     # outputs = [self.backward_weights[i] * self.backward_errors[i] * (activation*(1-activation)) for i in range(len(self.backward_weights))]
-    #     outputs = [self.backward_weights[i] * self.backward_errors[i] * self.H(internal_value, dev=True) for i in
-    #                range(len(self.backward_weights))]
-    #     return sum(outputs)
-
-    # def delta_w(self, activations):
-    #     delta_w = [0.0 for i in range(self.num_inputs)]
-    #     for i in range(self.num_inputs):
-    #         if self.forward_weights[i]:
-    #             delta_w[i] += l_rate * self.error * activations[i]  # * self.forward_weights[i] #self.error
-    #     return delta_w
 
 
 class Network(object):
@@ -99,6 +74,7 @@ class Network(object):
         self.internal_values = [0.0 for i in range(self.number_of_neurons)]
         # matrix multiplication of w[] and z[]
         self.errors = [0.0 for i in range(self.number_of_neurons)]
+        self.neuron_gradients = [0.0 for i in range(self.number_of_neurons)]
         self.bias = bias
         self.gradient_matrix = []
 
@@ -119,9 +95,9 @@ class Network(object):
     def forward_step(self):
         activations = []
         internal_values = []
-        self.inputs = np.add(np.array(self.activations), np.array(self.inputs)).tolist()
+        self.total_inputs = np.add(np.array(self.activations), np.array(self.inputs)).tolist()
         for neuron in self.neuron_list:
-            neuron.input = self.inputs
+            neuron.input = self.total_inputs
             neuron.forward_step()
             activations.append(neuron.activation)
             internal_values.append(neuron.internal_value)
@@ -130,12 +106,33 @@ class Network(object):
         self.activations = activations
         self.internal_values = internal_values
 
-    def calculate_all_gradients(self, activations, internal_values):
-        gradient_matrix = []
+    def calculate_all_gradients(self, activations, internal_values, error=False):
+        neuron_gradients = [0.0 for i in range(number_of_neurons)]
+        # update internal neuron gradients
         for idx, neuron in enumerate(self.neuron_list):
-            gradient_matrix.append(neuron.calculate_gradients(idx, activations, internal_values))
-        self.gradient_matrix = np.array(gradient_matrix).transpose()
-        return self.gradient_matrix
+            if idx >= number_of_neurons - output_neurons:
+                if not isinstance(error, bool):
+                    neuron_gradients[idx] = neuron.H(internal_values[idx], dev=True) * error
+                else:
+                    neuron_gradients[idx] = neuron.H(internal_values[idx], dev=True)
+            else:
+                gradient = 0.0
+                for post_neuron in range(self.number_of_neurons):
+                    gradient += self.weight_matrix[idx][post_neuron] * self.neuron_gradients[post_neuron] * neuron.H(internal_values[idx], dev=True)
+                neuron_gradients[idx] = gradient
+        # pass new gradients into the neurons
+        self.neuron_gradients = neuron_gradients
+        # update synapses
+        synapse_gradients = self.calc_synapse_gradients(activations)
+        return synapse_gradients
+
+    def calc_synapse_gradients(self, activations):
+        synapse_gradients = np.zeros([self.number_of_neurons, self.number_of_neurons])
+        for i in range(self.number_of_neurons):
+            for j in range(self.number_of_neurons):
+                if self.weight_matrix[i][j]:
+                    synapse_gradients[i][j] = self.neuron_gradients[j] * activations[i]
+        return synapse_gradients
 
     def backward_step(self, activations, internal_values, error):
         self.calculate_all_gradients(activations, internal_values)
@@ -151,28 +148,8 @@ class Network(object):
         self.errors = errors
         return errors
 
-    # def backward_step(self, internal_values, activations, delta):
-    #     gradients = [0.0 for i in range(number_of_neurons)]
-    #     for idx, neuron in reversed(list(enumerate(self.neuron_list))):
-    #         if idx >= number_of_neurons - output_neurons:
-    #             # this way would need to be done per synapse, move first half to the neuron? or pos whole thing?
-    #             neuron.gradient = (internal_values[idx]) * neuron.H(internal_values[idx], dev=True)
-    #         else:
-    #             neuron.backward_errors = self.errors
-    #             # neuron.backward_step(activations[idx])
-    #             neuron.backward_step(internal_values[idx])
-    #         errors[idx] = neuron.error
-    #     self.errors = errors
-    #
-    # def weight_update(self, internal_values, activations, deltas):
-    #     self.backward_step(internal_values, activations, deltas)
-    #     update_weight_matrix = []
-    #     for neuron in self.neuron_list:
-    #         update_weight_matrix.append(neuron.delta_w(activations))
-    #     return update_weight_matrix
 
-
-def gradient_and_error(weight_matrix, error_return=False, print_update=False):
+def gradient_and_error(weight_matrix, error_return=False, print_update=True):
     global number_of_neurons, epoch_errors, neuron_output
     number_of_neurons = len(weight_matrix)
     # weight_matrix.tolist()
@@ -184,34 +161,38 @@ def gradient_and_error(weight_matrix, error_return=False, print_update=False):
     output_delta = []
     network = Network(weight_matrix)
     np.random.seed(272727)
+    all_errors.append(0.0)
+    all_activations.append(network.activations)
+    all_internal_values.append(network.internal_values)
+    all_inputs.append(network.inputs)
     for step in range(steps):
         inputs = [0.0 for i in range(number_of_neurons)]
         for i in range(input_neurons):
-            inputs[i] = float(step) / float(steps)  # np.random.random()
+            inputs[i] = 0#np.random.random() # float(step) / float(steps)  #
         network.inputs = inputs
         network.forward_step()
         all_activations.append(network.activations)
         all_internal_values.append(network.internal_values)
         all_inputs.append(network.inputs)
-        output_activation.append(all_activations[step][-1])
+        output_activation.append(all_activations[step+1][-1])
         if learn == 'hz':
-            error = 0.5 * np.power(output_activation[-1] - target_hz, 2)
+            error = 0.5 * np.power(output_activation[-1] - target_hz, 2) #* np.sign(output_activation[-1] - target_hz)
             # error = output_activation[-1] - target_hz
         else:
             error = 0.5 * np.power(output_activation[-1] - target_sine_wave[step], 2) * np.sign(
                 output_activation[-1] - target_sine_wave[step])
             # error = output_activation[-1] - target_sine_wave[step]
         all_errors.append(error)
-        output_delta.append(error * output_activation[-1] * (1 - output_activation[-1]))
-    print "error:", sum(all_errors)
-    epoch_errors.append(sum(all_errors))
+    print "error:", np.average(all_errors)
+    epoch_errors.append(np.average(all_errors))
     neuron_output = output_activation
     if error_return:
-        return sum(all_errors)
+        return (all_errors[-1])
+        return np.average(all_errors)
     weight_update = np.zeros([number_of_neurons, number_of_neurons])
-    for step in reversed(range(steps)):
+    for step in reversed(range(steps+1)):
         # new_weight_update = np.array(network.backward_step(all_activations[step], all_internal_values[step], all_errors[step]))
-        new_weight_update = np.array(network.calculate_all_gradients(all_activations[step], all_internal_values[step]))
+        new_weight_update = np.array(network.calculate_all_gradients(all_activations[step], all_internal_values[step], error=all_errors[step]))
         # if learn == 'sine' and not total:
         #     new_weight_update = np.array(
         #         network.weight_update(all_internal_values[step], all_activations[step], output_delta[step])).transpose()
@@ -219,9 +200,12 @@ def gradient_and_error(weight_matrix, error_return=False, print_update=False):
         #     new_weight_update = np.array(
         #         network.weight_update(all_internal_values[step], all_activations[step], output_delta[step])).transpose()
         #     # new_weight_update = np.array(network.weight_update(all_internal_values[step], all_activations[step], error)).transpose()
-        weight_update -= new_weight_update * l_rate
+        weight_update += new_weight_update #* l_rate
         if print_update:
             print "weight update:", new_weight_update
+        # if step < 2: #steps / 2:
+        #     return new_weight_update
+    # weight_update /= steps + 1
     if print_update:
         print "total update:", weight_update
     return weight_update
@@ -229,8 +213,8 @@ def gradient_and_error(weight_matrix, error_return=False, print_update=False):
 
 # Feedforward network
 bias = False
-neurons_per_layer = 1
-hidden_layers = 2
+neurons_per_layer = 3
+hidden_layers = 3
 input_neurons = 1
 output_neurons = 1
 weight_scale = np.sqrt(neurons_per_layer)
@@ -266,6 +250,8 @@ for i in range(neurons_per_layer):
 #             weight_matrix[i][j] = 0.0
 #
 
+np.random.seed(272727)
+
 if bias:
     weight_matrix.append(np.ones(number_of_neurons).tolist())
 
@@ -274,21 +260,22 @@ for i in range(input_neurons):
     biases[i] = 1
 bias_value = 1.0
 
-epochs = 100
-l_rate = 0.1
+epochs = 10000
+l_rate = 1
 max_l_rate = 0.05
 min_l_rate = 0.00001
 # Duration of the simulation in ms
-T = 5
+T = 50
 # Duration of each time step in ms
 dt = 1
 # Number of iterations = T/dt
 steps = int(T / dt)
 
 learn = 'hz'
-target_hz = 0.78
+target_hz = 0.28
 sine_rate = 100
 sine_scale = 0.25
+min_error = 0.00000001
 total = False
 target_sine = lambda x: sine_scale * (np.sin(sine_rate * x)) + 0.5
 target_sine_wave = [target_sine(t / 1000.0) for t in range(steps)]
@@ -298,10 +285,10 @@ neuron_output = []
 
 if __name__ == "__main__":
     for epoch in range(epochs):
-        weight_update = gradient_and_error(weight_matrix, error_return=False, print_update=True)
-        weight_matrix = (np.array(weight_matrix) - weight_update).tolist()
+        weight_update = gradient_and_error(weight_matrix, error_return=False, print_update=False)
+        weight_matrix = (np.array(weight_matrix) - (weight_update * l_rate)).tolist()
 
-        if epoch % 100 == 0 or abs(epoch_errors[-1]) < 0.001:
+        if epoch % 100 == 0 or abs(epoch_errors[-1]) < min_error:
             plt.figure()
             plt.title('target sine')
             plt.xlabel('Time (msec)')
@@ -309,9 +296,11 @@ if __name__ == "__main__":
             plt.axhline(y=target_hz, color='r', linestyle='-')
             plt.plot(neuron_output)
             plt.show()
+            if abs(epoch_errors[-1]) < min_error:
+                break
 
     plt.figure()
-    plt.title('target sine')
+    plt.title('Final target sine etc')
     plt.xlabel('Time (msec)')
     plt.plot(target_sine_wave)
     plt.axhline(y=target_hz, color='r', linestyle='-')
