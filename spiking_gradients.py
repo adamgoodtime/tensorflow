@@ -8,7 +8,7 @@ warnings.filterwarnings("error")
 
 class sigmoid_neuron(object):
 
-    def __init__(self, forward_weights, backward_weights, output=False):
+    def __init__(self, forward_weights, backward_weights, output=False, v_rest=0.0, cm=1.0, tau_m=20.0, tau_refract=5.0, v_thresh=1.0, v_reset=0.0, i_offset=0.0):
         self.forward_weights = forward_weights
         self.num_inputs = len(forward_weights)
 
@@ -20,12 +20,27 @@ class sigmoid_neuron(object):
 
         self.output = output
 
-        self.internal_value = 0.0
-        self.activation = self.H(self.internal_value)
+        self.alpha = np.exp(- dt / tau_m)
+        # neuron variable
+        self.v_rest = v_rest  # * 10**-3
+        self.cm = cm  # * 10**-3
+        self.tau_m = tau_m  # * 10**-3
+        self.r_mem = 1.0  # self.tau_m / cm
+        self.tau_refract = tau_refract
+        self.v_thresh = v_thresh  # * 10**-3
+        self.v_reset = v_reset  # * 10**-3
+        self.i_offset = i_offset
+        # state variables
+        self.v = self.v_rest
+        self.scaled_v = (self.v - self.v_thresh) / self.v_thresh
+        self.t_rest = 0.0
+        self.i = self.i_offset
+
+        self.activation = False
         self.input = [0.0 for i in range(self.num_inputs)]
 
     # activation function
-    def H(self, x, dev=False, gammma=0.1, sigmoid=True, internal=True):
+    def H(self, x, dev=False, gammma=0.1, sigmoid=False, internal=True):
         if self.output:
             if dev:
                 return 1
@@ -33,7 +48,7 @@ class sigmoid_neuron(object):
                 return x
         if not sigmoid:
             if dev:
-                return (gammma / self.dt) * max(0, 1 - abs(x))
+                return (gammma / dt) * max(0, 1 - abs(x))
             else:
                 return gammma * max(0, 1 - abs(x))
         if dev:
@@ -54,12 +69,24 @@ class sigmoid_neuron(object):
                 return 1 / (1 + np.exp(-x))
 
     def forward_step(self):
-        self.internal_value = self.integrate_inputs()
-        self.activation = self.H(self.internal_value)
+        if not self.t_rest:
+            current = self.integrate_inputs()
+            self.v = (self.alpha * (self.v - self.v_rest)) + ((1 - self.alpha) * self.r_mem * current)
+            self.scaled_v = (self.v - self.v_thresh) / self.v_thresh
+            self.activation = self.did_it_spike()
+        else:
+            self.t_rest -= 1.0
+
+    def did_it_spike(self):
+        if self.scaled_v >= 0:
+            self.t_rest = self.tau_refract
+            return True
+        else:
+            return False
 
     def integrate_inputs(self):
         inputs = [self.forward_weights[i] * self.input[i] for i in range(len(self.forward_weights))]
-        return sum(inputs)
+        return sum(inputs) + self.i_offset
 
 
 class Network(object):
@@ -95,12 +122,14 @@ class Network(object):
     def forward_step(self):
         activations = []
         internal_values = []
-        self.total_inputs = np.add(np.array(self.activations), np.array(self.inputs)).tolist()
-        for neuron in self.neuron_list:
+        # self.total_inputs = np.add(np.array(self.activations), np.array(self.inputs)).tolist()
+        self.total_inputs = self.activations
+        for id, neuron in enumerate(self.neuron_list):
             neuron.input = self.total_inputs
+            neuron.i_offset = self.inputs[id]
             neuron.forward_step()
             activations.append(neuron.activation)
-            internal_values.append(neuron.internal_value)
+            internal_values.append(neuron.v)
         if self.bias:
             activations.append(bias_value)
         self.activations = activations
@@ -171,7 +200,7 @@ def gradient_and_error(weight_matrix, error_return=False, print_update=True):
     for step in range(steps):
         inputs = [0.0 for i in range(number_of_neurons)]
         for i in range(input_neurons):
-            inputs[i] = np.random.random() # float(step) / float(steps)  #
+            inputs[i] = np.random.random() * 100# float(step) / float(steps)  #
         network.inputs = inputs
         network.forward_step()
         all_activations.append(network.activations)
