@@ -171,7 +171,7 @@ def gradient_and_error(weight_matrix, error_return=False, print_update=True):
     for step in range(steps):
         inputs = [0.0 for i in range(number_of_neurons)]
         for i in range(input_neurons):
-            inputs[i] = np.random.random() # float(step) / float(steps)  #
+            inputs[i] = float(step) / float(steps) # np.random.random() #
         network.inputs = inputs
         network.forward_step()
         all_activations.append(network.activations)
@@ -235,8 +235,8 @@ for i in range(neurons_per_layer):
 # weight_matrix = np.transpose(weight_matrix).tolist()
 
 # Recurrent network
-number_of_neurons = 10
-input_neurons = 2
+number_of_neurons = 50
+input_neurons = 10
 weight_scale = np.sqrt(number_of_neurons)
 weight_matrix = [[np.random.randn() / weight_scale for i in range(number_of_neurons)] for j in
                  range(number_of_neurons)]
@@ -262,7 +262,7 @@ l_rate = 0.1
 max_l_rate = 0.05
 min_l_rate = 0.00001
 # Duration of the simulation in ms
-T = 400
+T = 200
 # Duration of each time step in ms
 dt = 1
 # Number of iterations = T/dt
