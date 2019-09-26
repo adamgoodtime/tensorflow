@@ -1,8 +1,6 @@
 import numpy as np
 from graz_non_tensor import *
 from graz_sigmoid import *
-from trask_rnn_BPTT import *
-from brilliant_BP_formulas import *
 from true_gradients import *
 
 # target hz - z * pseudo_Dev * pre_synap spike + c + (1 - alpha)
@@ -115,8 +113,8 @@ if __name__ == "__main__":
     # I = np.random.randn((input_dim * hidden_dim) + (hidden_dim * hidden_dim) + (hidden_dim * output_dim))
     # f = lambda x: trask_BPTT(x, input_dim, hidden_dim, output_dim, error_return=True)
     # df = lambda x: trask_BPTT(x, input_dim, hidden_dim, output_dim, error_return=False)
-    f = lambda x: gradient_and_error(x.reshape((int(np.sqrt(len(x))), int(np.sqrt(len(x))))), error_return=True)
-    df = lambda x: gradient_and_error(x.reshape((int(np.sqrt(len(x))), int(np.sqrt(len(x))))), error_return=False)
+    f = lambda x: gradient_and_error(x.reshape((int(np.sqrt(len(x))), int(np.sqrt(len(x))))), error_return=True, test=True)
+    df = lambda x: gradient_and_error(x.reshape((int(np.sqrt(len(x))), int(np.sqrt(len(x))))), error_return=False, test=True)
 
     w0 = I
     check_gradient(f, df, w0)

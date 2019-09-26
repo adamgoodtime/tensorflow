@@ -150,7 +150,7 @@ class Network(object):
         return errors
 
 
-def gradient_and_error(weight_matrix, error_return=False, print_update=True):
+def gradient_and_error(weight_matrix, error_return=False, print_update=True, test=False):
     global number_of_neurons, epoch_errors, neuron_output
     number_of_neurons = len(weight_matrix)
     # weight_matrix.tolist()
@@ -170,8 +170,9 @@ def gradient_and_error(weight_matrix, error_return=False, print_update=True):
     all_inputs.append(network.inputs)
     for step in range(steps):
         inputs = [0.0 for i in range(number_of_neurons)]
-        for i in range(input_neurons):
-            inputs[i] = float(step) / float(steps) # np.random.random() #
+        if not test:
+            for i in range(input_neurons):
+                inputs[i] = np.random.random() # float(step) / float(steps) #
         network.inputs = inputs
         network.forward_step()
         all_activations.append(network.activations)
@@ -187,7 +188,8 @@ def gradient_and_error(weight_matrix, error_return=False, print_update=True):
             # error = output_activation[-1] - target_sine_wave[step]
         all_errors.append(error)
         all_drv_errors.append(drv_error)
-    print epoch, "/", epochs, "error:", np.average(all_errors)
+    if not test:
+        print epoch, "/", epochs, "error:", np.average(all_errors)
     epoch_errors.append(np.average(all_errors))
     neuron_output = output_activation
     if error_return:
@@ -236,7 +238,7 @@ for i in range(neurons_per_layer):
 
 # Recurrent network
 number_of_neurons = 50
-input_neurons = 10
+input_neurons = 1
 weight_scale = np.sqrt(number_of_neurons)
 weight_matrix = [[np.random.randn() / weight_scale for i in range(number_of_neurons)] for j in
                  range(number_of_neurons)]
@@ -268,7 +270,7 @@ dt = 1
 # Number of iterations = T/dt
 steps = int(T / dt)
 
-learn = 'sine'
+learn = 'hz'
 target_hz = 0.28
 sine_rate = 5.0
 sine_scale = 0.05
