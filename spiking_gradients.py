@@ -329,7 +329,7 @@ if __name__ == "__main__":
 
         if epoch % 10 == 0 or abs(epoch_errors[-1]) < min_error:
             fig, axs = plt.subplots(3)
-            plt.title('target sine')
+            plt.title("no. neurons = ", number_of_neurons, "\tno. inputs = ", input_neurons, "\tLR = ", l_rate)
             plt.xlabel('Time (msec)')
             axs[0].plot(target_sine_wave)
             axs[0].plot(output_v)
@@ -341,7 +341,7 @@ if __name__ == "__main__":
                 break
 
     fig, axs = plt.subplots(3)
-    plt.title('target sine')
+    plt.title("no. neurons = ", number_of_neurons, "\tno. inputs = ", input_neurons, "\tLR = ", l_rate)
     plt.xlabel('Time (msec)')
     axs[0].plot(target_sine_wave)
     axs[0].plot(output_v)
