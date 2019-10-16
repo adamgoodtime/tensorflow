@@ -107,9 +107,10 @@ class spiking_neuron(object):
 
 class Network(object):
 
-    def __init__(self, weight_matrix, bias=False):
+    def __init__(self, weight_matrix, delay_matrix, bias=False):
         # network variables
         self.weight_matrix = weight_matrix
+        self.delay_matrix = delay_matrix
         self.number_of_neurons = len(weight_matrix)
         self.neuron_list = []
         self.inputs = [0.0 for i in range(self.number_of_neurons)]
@@ -185,7 +186,7 @@ class Network(object):
         return synapse_gradients
 
 
-def gradient_and_error(weight_matrix, error_return=False, print_update=True):
+def gradient_and_error(weight_matrix, delay_matrix, error_return=False, print_update=True):
     global number_of_neurons, epoch_errors, neuron_output
     number_of_neurons = len(weight_matrix)
     # weight_matrix.tolist()
@@ -197,7 +198,7 @@ def gradient_and_error(weight_matrix, error_return=False, print_update=True):
     output_activation = []
     output_v = []
     output_delta = []
-    network = Network(weight_matrix)
+    network = Network(weight_matrix, delay_matrix)
     np.random.seed(2727)
     all_errors.append(0.0)
     all_drv_errors.append(0.0)
@@ -292,6 +293,15 @@ weight_matrix = [[np.random.randn() / weight_scale for i in range(number_of_neur
 #             weight_matrix[i][j] = 0.0
 #
 
+# Create delay matrix
+min_delay = 1
+max_delay = 16
+delay_matrix = deepcopy(weight_matrix)
+for i in range(len(delay_matrix)):
+    for j in range(len(delay_matrix[0])):
+        if delay_matrix[i][j]:
+            delay_matrix[i][j] = np.random.randint(min_delay, max_delay)
+
 if bias:
     weight_matrix.append(np.ones(number_of_neurons).tolist())
 
@@ -327,7 +337,7 @@ neuron_output = []
 if __name__ == "__main__":
     print "no. neurons = ", number_of_neurons, "\tno. inputs = ", input_neurons, "\tLR = ", l_rate
     for epoch in range(epochs):
-        weight_update, activations, output_v = gradient_and_error(weight_matrix, error_return=False, print_update=False)
+        weight_update, activations, output_v = gradient_and_error(weight_matrix, delay_matrix, error_return=False, print_update=False)
         weight_matrix = (np.array(weight_matrix) - (weight_update * l_rate)).tolist()
 
         if epoch % 20 == 0 or abs(epoch_errors[-1]) < min_error:
