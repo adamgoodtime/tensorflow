@@ -1,7 +1,9 @@
 import numpy as np
 from graz_non_tensor import *
 from graz_sigmoid import *
-from true_gradients import *
+# from true_gradients import *
+from delayed_spikes import *
+# from spiking_gradients import *
 
 # target hz - z * pseudo_Dev * pre_synap spike + c + (1 - alpha)
 
@@ -17,9 +19,11 @@ def check_gradient(f, df, x0, tries=10, deltas=(1e-2, 1e-4, 1e-6)):
     for k_dx in range(tries):
         # random steps
         # dx = np.random.randn(x0.size) + mean
-        dx = np.array([0, 1, 0,
-                       0, 0, 1,
-                       0, 0, 0])
+        # dx = np.array([0, 100, 0,
+        #                0, 0, 100,
+        #                0, 0, 0])
+        dx = np.array([0, 1,
+                       0, 0])
         # dx = np.random.randn(len(x0), len(x0[0]))
 
         # initialise error
@@ -74,16 +78,17 @@ def check_gradient(f, df, x0, tries=10, deltas=(1e-2, 1e-4, 1e-6)):
 
 
 if __name__ == "__main__":
+    printing = True
     np.random.seed(25437)
     mean = 0
     # I = np.random.randn(9) + mean
     # I = np.array([[0, 1], [0, 0]])
     # I = np.array([0, np.random.randn(1).tolist()[0], 0, 0])
-    I = np.array([0, 1.25, 0,
-                  0, 0, 0.5,
-                  0, 0, 0])
-    # I = np.array([0, 0.5,
-    #               0, 0])
+    # I = np.array([0, 10.25, 0,
+    #               0, 0, 10.5,
+    #               0, 0, 0])
+    I = np.array([0, 0.5,
+                  0, 0])
     # I = np.array([0, 0, 0,
     #               0, 0, 0.5,
     #               0, 0, 0])
@@ -95,7 +100,6 @@ if __name__ == "__main__":
     #               0, 0, 0.5, 0,
     #               0, 0, 0, -0.3,
     #               0, 0, 0, 0])
-
 
     # f = lambda w: 0.5 * np.sum(w ** 2)
     # df = lambda w: w
@@ -113,8 +117,8 @@ if __name__ == "__main__":
     # I = np.random.randn((input_dim * hidden_dim) + (hidden_dim * hidden_dim) + (hidden_dim * output_dim))
     # f = lambda x: trask_BPTT(x, input_dim, hidden_dim, output_dim, error_return=True)
     # df = lambda x: trask_BPTT(x, input_dim, hidden_dim, output_dim, error_return=False)
-    f = lambda x: gradient_and_error(x.reshape((int(np.sqrt(len(x))), int(np.sqrt(len(x))))), error_return=True, test=True)
-    df = lambda x: gradient_and_error(x.reshape((int(np.sqrt(len(x))), int(np.sqrt(len(x))))), error_return=False, test=True)
+    f = lambda x: gradient_and_error(x.reshape((int(np.sqrt(len(x))), int(np.sqrt(len(x))))), error_return=True, test=True, print_update=printing)
+    df = lambda x: gradient_and_error(x.reshape((int(np.sqrt(len(x))), int(np.sqrt(len(x))))), error_return=False, test=True, print_update=printing)
 
     w0 = I
     check_gradient(f, df, w0)

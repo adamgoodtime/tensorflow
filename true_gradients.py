@@ -214,7 +214,7 @@ def gradient_and_error(weight_matrix, error_return=False, print_update=True, tes
 bias = False
 neurons_per_layer = 3
 hidden_layers = 3
-input_neurons = 6
+input_neurons = 1
 output_neurons = 1
 weight_scale = np.sqrt(neurons_per_layer)
 number_of_neurons = input_neurons + (hidden_layers * neurons_per_layer) + output_neurons
@@ -270,10 +270,10 @@ dt = 1
 # Number of iterations = T/dt
 steps = int(T / dt)
 
-learn = 'hz'
+learn = 'sine'
 target_hz = 0.28
 sine_rate = 5.0
-sine_scale = 0.05
+sine_scale = 0.5
 min_error = 0.00000001
 total = False
 target_sine = lambda x: sine_scale * (np.sin(sine_rate * x)) + 0.5
