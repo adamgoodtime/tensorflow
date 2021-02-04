@@ -18,7 +18,7 @@ from tf_agents.trajectories import time_step as ts
 tf.compat.v1.enable_v2_behavior()
 
 
-class CardGameEnv(py_environment.PyEnvironment):
+class xor_env(py_environment.PyEnvironment):
 
     def __init__(self):
         self._action_spec = array_spec.BoundedArraySpec(
@@ -63,13 +63,13 @@ class CardGameEnv(py_environment.PyEnvironment):
                 np.array([self._state], dtype=np.int32), reward=0.0, discount=1.0)
 
 
-environment = CardGameEnv()
+environment = xor_env()
 utils.validate_py_environment(environment, episodes=5)
 
 get_new_card_action = np.array(0, dtype=np.int32)
 end_round_action = np.array(1, dtype=np.int32)
 
-environment = CardGameEnv()
+environment = xor_env()
 time_step = environment.reset()
 print(time_step)
 cumulative_reward = time_step.reward
