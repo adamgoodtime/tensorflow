@@ -20,13 +20,18 @@ tf.compat.v1.enable_v2_behavior()
 
 class xor_env(py_environment.PyEnvironment):
 
-    def __init__(self):
+    def __init__(self, exposure_time=10):
         self._action_spec = array_spec.BoundedArraySpec(
-            shape=(), dtype=np.int32, minimum=0, maximum=1, name='action')
+            shape=(), dtype=np.int32, minimum=0, maximum=4, name='action')
         self._observation_spec = array_spec.BoundedArraySpec(
-            shape=(1,), dtype=np.int32, minimum=0, name='observation')
+            shape=(1,), dtype=np.int32, minimum=0, maximum=1, name='observation')
         self._state = 0
+        self._possible_states = [[0, 0], [0, 1], [1, 0], [1, 1]]
+        self._correct_output = [0, 1, 1, 0]
         self._episode_ended = False
+        self._dt = 1
+        self._exposure_time = exposure_time
+        self._current_time = 0
 
     def action_spec(self):
         return self._action_spec
@@ -35,51 +40,55 @@ class xor_env(py_environment.PyEnvironment):
         return self._observation_spec
 
     def _reset(self):
+        self._current_time = 0
         self._state = 0
         self._episode_ended = False
         return ts.restart(np.array([self._state], dtype=np.int32))
 
     def _step(self, action):
+        if self._current_time >= self._exposure_time:
+            self._current_time = 0
+            self._state += 1
+
+        if self._state >= len(self._correct_output):
+            return self._reset()
+
+        print("state {} - time {}".format(self._state, self._current_time))
+        # Make sure episodes don't go on forever.
+        if action == self._correct_output[self._state]:
+            reward = 1
+        else:
+            reward = 0
+            # raise ValueError('`action` should be 0 or 1.')
+        self._current_time += self._dt
 
         if self._episode_ended:
-            # The last action ended the episode. Ignore the current action and start
-            # a new episode.
-            return self.reset()
-
-        # Make sure episodes don't go on forever.
-        if action == 1:
-            self._episode_ended = True
-        elif action == 0:
-            new_card = np.random.randint(1, 11)
-            self._state += new_card
-        else:
-            raise ValueError('`action` should be 0 or 1.')
-
-        if self._episode_ended or self._state >= 21:
-            reward = self._state - 21 if self._state <= 21 else -21
             return ts.termination(np.array([self._state], dtype=np.int32), reward)
         else:
             return ts.transition(
-                np.array([self._state], dtype=np.int32), reward=0.0, discount=1.0)
+                np.array([self._state], dtype=np.int32), reward=reward, discount=1.0)
 
 
-environment = xor_env()
-utils.validate_py_environment(environment, episodes=5)
+# environment = xor_env()
+# utils.validate_py_environment(environment, episodes=5)
 
-get_new_card_action = np.array(0, dtype=np.int32)
-end_round_action = np.array(1, dtype=np.int32)
+out_zero = np.array(0, dtype=np.int32)
+out_one = np.array(1, dtype=np.int32)
 
 environment = xor_env()
 time_step = environment.reset()
 print(time_step)
 cumulative_reward = time_step.reward
 
-for _ in range(3):
-    time_step = environment.step(get_new_card_action)
+for _ in range(50):
+    if np.random.random() > 0.5:
+        time_step = environment.step(out_zero)
+    else:
+        time_step = environment.step(out_one)
     print(time_step)
     cumulative_reward += time_step.reward
 
-time_step = environment.step(end_round_action)
-print(time_step)
+# time_step = environment.step(end_round_action)
+# print(time_step)
 cumulative_reward += time_step.reward
 print('Final Reward = ', cumulative_reward)
